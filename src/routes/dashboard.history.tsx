@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,24 +79,38 @@ function HistoryPage() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {attempts.map((a) => (
-            <li
-              key={a.id}
-              className="flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-card"
-            >
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {a.correct_count}/{a.total_questions} correct
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(a.created_at).toLocaleString()} · {a.status}
-                </p>
-              </div>
-              <p className="text-lg font-semibold text-primary">
-                {a.score_percent !== null ? `${a.score_percent}%` : "—"}
-              </p>
-            </li>
-          ))}
+          {attempts.map((a) => {
+            const href =
+              a.status === "completed"
+                ? ({
+                    to: "/dashboard/exam/$attemptId/review",
+                    params: { attemptId: a.id },
+                  } as const)
+                : ({
+                    to: "/dashboard/exam/$attemptId",
+                    params: { attemptId: a.id },
+                  } as const);
+            return (
+              <li key={a.id}>
+                <Link
+                  {...href}
+                  className="flex items-center justify-between rounded-xl border border-border bg-card p-4 shadow-card transition-shadow hover:shadow-elegant"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {a.correct_count}/{a.total_questions} correct
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(a.created_at).toLocaleString()} · {a.status}
+                    </p>
+                  </div>
+                  <p className="text-lg font-semibold text-primary">
+                    {a.score_percent !== null ? `${a.score_percent}%` : "—"}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

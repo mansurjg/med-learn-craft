@@ -71,28 +71,31 @@ function BanksPage() {
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
           {banks.map((b) => (
-            <li
-              key={b.id}
-              className="rounded-xl border border-border bg-card p-5 shadow-card"
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <BookOpen className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {b.title}
-                  </p>
-                  {b.subject && (
-                    <p className="text-xs text-muted-foreground">{b.subject}</p>
-                  )}
-                  {b.description && (
-                    <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
-                      {b.description}
+            <li key={b.id}>
+              <Link
+                to="/dashboard/banks/$bankId"
+                params={{ bankId: b.id }}
+                className="block rounded-xl border border-border bg-card p-5 shadow-card transition-shadow hover:shadow-elegant"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {b.title}
                     </p>
-                  )}
+                    {b.subject && (
+                      <p className="text-xs text-muted-foreground">{b.subject}</p>
+                    )}
+                    {b.description && (
+                      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                        {b.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </Link>
             </li>
           ))}
         </ul>

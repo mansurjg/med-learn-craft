@@ -20,6 +20,9 @@ import { Route as DashboardProfileRouteImport } from './routes/dashboard.profile
 import { Route as DashboardHistoryRouteImport } from './routes/dashboard.history'
 import { Route as DashboardBanksRouteImport } from './routes/dashboard.banks'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard.admin'
+import { Route as DashboardExamAttemptIdRouteImport } from './routes/dashboard.exam.$attemptId'
+import { Route as DashboardBanksBankIdRouteImport } from './routes/dashboard.banks.$bankId'
+import { Route as DashboardExamAttemptIdReviewRouteImport } from './routes/dashboard.exam.$attemptId.review'
 
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
@@ -76,6 +79,22 @@ const DashboardAdminRoute = DashboardAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardExamAttemptIdRoute = DashboardExamAttemptIdRouteImport.update({
+  id: '/exam/$attemptId',
+  path: '/exam/$attemptId',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardBanksBankIdRoute = DashboardBanksBankIdRouteImport.update({
+  id: '/$bankId',
+  path: '/$bankId',
+  getParentRoute: () => DashboardBanksRoute,
+} as any)
+const DashboardExamAttemptIdReviewRoute =
+  DashboardExamAttemptIdReviewRouteImport.update({
+    id: '/review',
+    path: '/review',
+    getParentRoute: () => DashboardExamAttemptIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -84,11 +103,14 @@ export interface FileRoutesByFullPath {
   '/features': typeof FeaturesRoute
   '/pricing': typeof PricingRoute
   '/dashboard/admin': typeof DashboardAdminRoute
-  '/dashboard/banks': typeof DashboardBanksRoute
+  '/dashboard/banks': typeof DashboardBanksRouteWithChildren
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/banks/$bankId': typeof DashboardBanksBankIdRoute
+  '/dashboard/exam/$attemptId': typeof DashboardExamAttemptIdRouteWithChildren
+  '/dashboard/exam/$attemptId/review': typeof DashboardExamAttemptIdReviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -96,11 +118,14 @@ export interface FileRoutesByTo {
   '/features': typeof FeaturesRoute
   '/pricing': typeof PricingRoute
   '/dashboard/admin': typeof DashboardAdminRoute
-  '/dashboard/banks': typeof DashboardBanksRoute
+  '/dashboard/banks': typeof DashboardBanksRouteWithChildren
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/dashboard/banks/$bankId': typeof DashboardBanksBankIdRoute
+  '/dashboard/exam/$attemptId': typeof DashboardExamAttemptIdRouteWithChildren
+  '/dashboard/exam/$attemptId/review': typeof DashboardExamAttemptIdReviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -110,11 +135,14 @@ export interface FileRoutesById {
   '/features': typeof FeaturesRoute
   '/pricing': typeof PricingRoute
   '/dashboard/admin': typeof DashboardAdminRoute
-  '/dashboard/banks': typeof DashboardBanksRoute
+  '/dashboard/banks': typeof DashboardBanksRouteWithChildren
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/dashboard/banks/$bankId': typeof DashboardBanksBankIdRoute
+  '/dashboard/exam/$attemptId': typeof DashboardExamAttemptIdRouteWithChildren
+  '/dashboard/exam/$attemptId/review': typeof DashboardExamAttemptIdReviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -130,6 +158,9 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/upload'
     | '/dashboard/'
+    | '/dashboard/banks/$bankId'
+    | '/dashboard/exam/$attemptId'
+    | '/dashboard/exam/$attemptId/review'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -142,6 +173,9 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/upload'
     | '/dashboard'
+    | '/dashboard/banks/$bankId'
+    | '/dashboard/exam/$attemptId'
+    | '/dashboard/exam/$attemptId/review'
   id:
     | '__root__'
     | '/'
@@ -155,6 +189,9 @@ export interface FileRouteTypes {
     | '/dashboard/profile'
     | '/dashboard/upload'
     | '/dashboard/'
+    | '/dashboard/banks/$bankId'
+    | '/dashboard/exam/$attemptId'
+    | '/dashboard/exam/$attemptId/review'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -244,25 +281,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/exam/$attemptId': {
+      id: '/dashboard/exam/$attemptId'
+      path: '/exam/$attemptId'
+      fullPath: '/dashboard/exam/$attemptId'
+      preLoaderRoute: typeof DashboardExamAttemptIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/banks/$bankId': {
+      id: '/dashboard/banks/$bankId'
+      path: '/$bankId'
+      fullPath: '/dashboard/banks/$bankId'
+      preLoaderRoute: typeof DashboardBanksBankIdRouteImport
+      parentRoute: typeof DashboardBanksRoute
+    }
+    '/dashboard/exam/$attemptId/review': {
+      id: '/dashboard/exam/$attemptId/review'
+      path: '/review'
+      fullPath: '/dashboard/exam/$attemptId/review'
+      preLoaderRoute: typeof DashboardExamAttemptIdReviewRouteImport
+      parentRoute: typeof DashboardExamAttemptIdRoute
+    }
   }
 }
 
+interface DashboardBanksRouteChildren {
+  DashboardBanksBankIdRoute: typeof DashboardBanksBankIdRoute
+}
+
+const DashboardBanksRouteChildren: DashboardBanksRouteChildren = {
+  DashboardBanksBankIdRoute: DashboardBanksBankIdRoute,
+}
+
+const DashboardBanksRouteWithChildren = DashboardBanksRoute._addFileChildren(
+  DashboardBanksRouteChildren,
+)
+
+interface DashboardExamAttemptIdRouteChildren {
+  DashboardExamAttemptIdReviewRoute: typeof DashboardExamAttemptIdReviewRoute
+}
+
+const DashboardExamAttemptIdRouteChildren: DashboardExamAttemptIdRouteChildren =
+  {
+    DashboardExamAttemptIdReviewRoute: DashboardExamAttemptIdReviewRoute,
+  }
+
+const DashboardExamAttemptIdRouteWithChildren =
+  DashboardExamAttemptIdRoute._addFileChildren(
+    DashboardExamAttemptIdRouteChildren,
+  )
+
 interface DashboardRouteChildren {
   DashboardAdminRoute: typeof DashboardAdminRoute
-  DashboardBanksRoute: typeof DashboardBanksRoute
+  DashboardBanksRoute: typeof DashboardBanksRouteWithChildren
   DashboardHistoryRoute: typeof DashboardHistoryRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardUploadRoute: typeof DashboardUploadRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
+  DashboardExamAttemptIdRoute: typeof DashboardExamAttemptIdRouteWithChildren
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAdminRoute: DashboardAdminRoute,
-  DashboardBanksRoute: DashboardBanksRoute,
+  DashboardBanksRoute: DashboardBanksRouteWithChildren,
   DashboardHistoryRoute: DashboardHistoryRoute,
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardUploadRoute: DashboardUploadRoute,
   DashboardIndexRoute: DashboardIndexRoute,
+  DashboardExamAttemptIdRoute: DashboardExamAttemptIdRouteWithChildren,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
