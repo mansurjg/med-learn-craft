@@ -114,6 +114,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           display_name: string | null
+          force_password_change: boolean
           id: string
           institution: string | null
           specialty: string | null
@@ -124,6 +125,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          force_password_change?: boolean
           id?: string
           institution?: string | null
           specialty?: string | null
@@ -134,6 +136,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          force_password_change?: boolean
           id?: string
           institution?: string | null
           specialty?: string | null
@@ -269,7 +272,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "super_admin" | "doctor" | "student"
       attempt_status: "in_progress" | "completed" | "abandoned"
       question_difficulty: "easy" | "medium" | "hard"
     }
@@ -399,7 +402,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "super_admin", "doctor", "student"],
       attempt_status: ["in_progress", "completed", "abandoned"],
       question_difficulty: ["easy", "medium", "hard"],
     },
