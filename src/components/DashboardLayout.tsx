@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   LogOut,
   User as UserIcon,
+  Users as UsersIcon,
 } from "lucide-react";
 
 const navItems = [
@@ -21,8 +22,13 @@ const navItems = [
 ] as const;
 
 export function DashboardLayout() {
-  const { signOut, user, isAdmin } = useAuth();
+  const { signOut, user, isAdmin, isStaff, isSuperAdmin } = useAuth();
   const location = useLocation();
+  const roleLabel = isSuperAdmin
+    ? "Super Admin"
+    : isAdmin
+      ? "Administrator"
+      : "Member";
 
   return (
     <div className="flex min-h-screen flex-col bg-background md:flex-row">
@@ -52,18 +58,31 @@ export function DashboardLayout() {
               </Link>
             );
           })}
-          {isAdmin && (
-            <Link
-              to="/dashboard/admin"
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                location.pathname.startsWith("/dashboard/admin")
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              <ShieldCheck className="h-4 w-4" />
-              Admin
-            </Link>
+          {isStaff && (
+            <>
+              <Link
+                to="/dashboard/users"
+                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  location.pathname.startsWith("/dashboard/users")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                <UsersIcon className="h-4 w-4" />
+                Users
+              </Link>
+              <Link
+                to="/dashboard/admin"
+                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  location.pathname.startsWith("/dashboard/admin")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Admin
+              </Link>
+            </>
           )}
         </nav>
         <div className="border-t border-border/60 p-3">
@@ -71,9 +90,7 @@ export function DashboardLayout() {
             <p className="truncate font-medium text-foreground">
               {user?.email}
             </p>
-            <p className="text-muted-foreground">
-              {isAdmin ? "Administrator" : "Member"}
-            </p>
+            <p className="text-muted-foreground">{roleLabel}</p>
           </div>
           <Button
             variant="ghost"

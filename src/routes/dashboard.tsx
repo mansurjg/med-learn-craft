@@ -1,4 +1,5 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useLocation, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
@@ -8,7 +9,20 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, forcePasswordChange } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (
+      !isLoading &&
+      isAuthenticated &&
+      forcePasswordChange &&
+      location.pathname !== "/dashboard/change-password"
+    ) {
+      void navigate({ to: "/dashboard/change-password", replace: true });
+    }
+  }, [isLoading, isAuthenticated, forcePasswordChange, location.pathname, navigate]);
 
   if (isLoading) {
     return (
@@ -19,7 +33,6 @@ function DashboardRoute() {
   }
 
   if (!isAuthenticated) {
-    // Client-side redirect — beforeLoad can't see auth state from React context
     throw redirect({ to: "/auth" });
   }
 

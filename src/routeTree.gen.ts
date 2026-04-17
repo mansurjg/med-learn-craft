@@ -15,9 +15,11 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
 import { Route as DashboardUploadRouteImport } from './routes/dashboard.upload'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard.profile'
 import { Route as DashboardHistoryRouteImport } from './routes/dashboard.history'
+import { Route as DashboardChangePasswordRouteImport } from './routes/dashboard.change-password'
 import { Route as DashboardBanksRouteImport } from './routes/dashboard.banks'
 import { Route as DashboardAdminRouteImport } from './routes/dashboard.admin'
 import { Route as DashboardExamAttemptIdRouteImport } from './routes/dashboard.exam.$attemptId'
@@ -54,6 +56,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardUsersRoute = DashboardUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardUploadRoute = DashboardUploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -67,6 +74,11 @@ const DashboardProfileRoute = DashboardProfileRouteImport.update({
 const DashboardHistoryRoute = DashboardHistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardChangePasswordRoute = DashboardChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardBanksRoute = DashboardBanksRouteImport.update({
@@ -104,9 +116,11 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/banks': typeof DashboardBanksRouteWithChildren
+  '/dashboard/change-password': typeof DashboardChangePasswordRoute
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/upload': typeof DashboardUploadRoute
+  '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/banks/$bankId': typeof DashboardBanksBankIdRoute
   '/dashboard/exam/$attemptId': typeof DashboardExamAttemptIdRouteWithChildren
@@ -119,9 +133,11 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/banks': typeof DashboardBanksRouteWithChildren
+  '/dashboard/change-password': typeof DashboardChangePasswordRoute
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/upload': typeof DashboardUploadRoute
+  '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/banks/$bankId': typeof DashboardBanksBankIdRoute
   '/dashboard/exam/$attemptId': typeof DashboardExamAttemptIdRouteWithChildren
@@ -136,9 +152,11 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/dashboard/admin': typeof DashboardAdminRoute
   '/dashboard/banks': typeof DashboardBanksRouteWithChildren
+  '/dashboard/change-password': typeof DashboardChangePasswordRoute
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
   '/dashboard/upload': typeof DashboardUploadRoute
+  '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/banks/$bankId': typeof DashboardBanksBankIdRoute
   '/dashboard/exam/$attemptId': typeof DashboardExamAttemptIdRouteWithChildren
@@ -154,9 +172,11 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/dashboard/admin'
     | '/dashboard/banks'
+    | '/dashboard/change-password'
     | '/dashboard/history'
     | '/dashboard/profile'
     | '/dashboard/upload'
+    | '/dashboard/users'
     | '/dashboard/'
     | '/dashboard/banks/$bankId'
     | '/dashboard/exam/$attemptId'
@@ -169,9 +189,11 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/dashboard/admin'
     | '/dashboard/banks'
+    | '/dashboard/change-password'
     | '/dashboard/history'
     | '/dashboard/profile'
     | '/dashboard/upload'
+    | '/dashboard/users'
     | '/dashboard'
     | '/dashboard/banks/$bankId'
     | '/dashboard/exam/$attemptId'
@@ -185,9 +207,11 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/dashboard/admin'
     | '/dashboard/banks'
+    | '/dashboard/change-password'
     | '/dashboard/history'
     | '/dashboard/profile'
     | '/dashboard/upload'
+    | '/dashboard/users'
     | '/dashboard/'
     | '/dashboard/banks/$bankId'
     | '/dashboard/exam/$attemptId'
@@ -246,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/users': {
+      id: '/dashboard/users'
+      path: '/users'
+      fullPath: '/dashboard/users'
+      preLoaderRoute: typeof DashboardUsersRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/upload': {
       id: '/dashboard/upload'
       path: '/upload'
@@ -265,6 +296,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/dashboard/history'
       preLoaderRoute: typeof DashboardHistoryRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/change-password': {
+      id: '/dashboard/change-password'
+      path: '/change-password'
+      fullPath: '/dashboard/change-password'
+      preLoaderRoute: typeof DashboardChangePasswordRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/banks': {
@@ -334,9 +372,11 @@ const DashboardExamAttemptIdRouteWithChildren =
 interface DashboardRouteChildren {
   DashboardAdminRoute: typeof DashboardAdminRoute
   DashboardBanksRoute: typeof DashboardBanksRouteWithChildren
+  DashboardChangePasswordRoute: typeof DashboardChangePasswordRoute
   DashboardHistoryRoute: typeof DashboardHistoryRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
   DashboardUploadRoute: typeof DashboardUploadRoute
+  DashboardUsersRoute: typeof DashboardUsersRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardExamAttemptIdRoute: typeof DashboardExamAttemptIdRouteWithChildren
 }
@@ -344,9 +384,11 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAdminRoute: DashboardAdminRoute,
   DashboardBanksRoute: DashboardBanksRouteWithChildren,
+  DashboardChangePasswordRoute: DashboardChangePasswordRoute,
   DashboardHistoryRoute: DashboardHistoryRoute,
   DashboardProfileRoute: DashboardProfileRoute,
   DashboardUploadRoute: DashboardUploadRoute,
+  DashboardUsersRoute: DashboardUsersRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardExamAttemptIdRoute: DashboardExamAttemptIdRouteWithChildren,
 }
