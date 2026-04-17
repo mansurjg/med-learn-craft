@@ -1,1 +1,4 @@
 project_id = "ahbkeryluvpfefoxlddm"
+
+[functions.extract-mcqs]
+verify_jwt = false
