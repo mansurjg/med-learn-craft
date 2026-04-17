@@ -2,3 +2,6 @@ project_id = "ahbkeryluvpfefoxlddm"
 
 [functions.extract-mcqs]
 verify_jwt = false
+
+[functions.admin-create-user]
+verify_jwt = true

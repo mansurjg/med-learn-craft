@@ -27,13 +27,13 @@ interface BankStat {
 }
 
 function AdminPage() {
-  const { isAdmin, isLoading } = useAuth();
+  const { isStaff, isLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [topBanks, setTopBanks] = useState<BankStat[]>([]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isStaff) return;
     let cancelled = false;
     void (async () => {
       const [users, banks, questions, attempts, banksFull] = await Promise.all([
@@ -96,11 +96,11 @@ function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin]);
+  }, [isStaff]);
 
   if (isLoading) return null;
 
-  if (!isAdmin) {
+  if (!isStaff) {
     return (
       <div className="rounded-2xl border border-border bg-card p-10 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
