@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
 import { Route as DashboardUploadRouteImport } from './routes/dashboard.upload'
+import { Route as DashboardQuestionsRouteImport } from './routes/dashboard.questions'
 import { Route as DashboardProfileRouteImport } from './routes/dashboard.profile'
 import { Route as DashboardHistoryRouteImport } from './routes/dashboard.history'
 import { Route as DashboardChangePasswordRouteImport } from './routes/dashboard.change-password'
@@ -64,6 +65,11 @@ const DashboardUsersRoute = DashboardUsersRouteImport.update({
 const DashboardUploadRoute = DashboardUploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardQuestionsRoute = DashboardQuestionsRouteImport.update({
+  id: '/questions',
+  path: '/questions',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardProfileRoute = DashboardProfileRouteImport.update({
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/change-password': typeof DashboardChangePasswordRoute
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/questions': typeof DashboardQuestionsRoute
   '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/dashboard/change-password': typeof DashboardChangePasswordRoute
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/questions': typeof DashboardQuestionsRoute
   '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/dashboard/change-password': typeof DashboardChangePasswordRoute
   '/dashboard/history': typeof DashboardHistoryRoute
   '/dashboard/profile': typeof DashboardProfileRoute
+  '/dashboard/questions': typeof DashboardQuestionsRoute
   '/dashboard/upload': typeof DashboardUploadRoute
   '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/dashboard/change-password'
     | '/dashboard/history'
     | '/dashboard/profile'
+    | '/dashboard/questions'
     | '/dashboard/upload'
     | '/dashboard/users'
     | '/dashboard/'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/dashboard/change-password'
     | '/dashboard/history'
     | '/dashboard/profile'
+    | '/dashboard/questions'
     | '/dashboard/upload'
     | '/dashboard/users'
     | '/dashboard'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/dashboard/change-password'
     | '/dashboard/history'
     | '/dashboard/profile'
+    | '/dashboard/questions'
     | '/dashboard/upload'
     | '/dashboard/users'
     | '/dashboard/'
@@ -282,6 +294,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/dashboard/upload'
       preLoaderRoute: typeof DashboardUploadRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/questions': {
+      id: '/dashboard/questions'
+      path: '/questions'
+      fullPath: '/dashboard/questions'
+      preLoaderRoute: typeof DashboardQuestionsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/profile': {
@@ -375,6 +394,7 @@ interface DashboardRouteChildren {
   DashboardChangePasswordRoute: typeof DashboardChangePasswordRoute
   DashboardHistoryRoute: typeof DashboardHistoryRoute
   DashboardProfileRoute: typeof DashboardProfileRoute
+  DashboardQuestionsRoute: typeof DashboardQuestionsRoute
   DashboardUploadRoute: typeof DashboardUploadRoute
   DashboardUsersRoute: typeof DashboardUsersRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -387,6 +407,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardChangePasswordRoute: DashboardChangePasswordRoute,
   DashboardHistoryRoute: DashboardHistoryRoute,
   DashboardProfileRoute: DashboardProfileRoute,
+  DashboardQuestionsRoute: DashboardQuestionsRoute,
   DashboardUploadRoute: DashboardUploadRoute,
   DashboardUsersRoute: DashboardUsersRoute,
   DashboardIndexRoute: DashboardIndexRoute,

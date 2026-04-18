@@ -11,11 +11,13 @@ import {
   LogOut,
   User as UserIcon,
   Users as UsersIcon,
+  ListChecks,
 } from "lucide-react";
 
 const navItems = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { to: "/dashboard/banks", label: "Question Banks", icon: BookOpen, exact: false },
+  { to: "/dashboard/questions", label: "All Questions", icon: ListChecks, exact: false },
   { to: "/dashboard/upload", label: "Upload MCQs", icon: Upload, exact: false },
   { to: "/dashboard/history", label: "Exam History", icon: History, exact: false },
   { to: "/dashboard/profile", label: "Profile", icon: UserIcon, exact: false },
