@@ -1,11 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, Loader2, ImagePlus, X, Sparkles } from "lucide-react";
+import {
+  Upload,
+  Loader2,
+  X,
+  Sparkles,
+  FileText,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/upload")({
   head: () => ({
@@ -16,83 +27,237 @@ export const Route = createFileRoute("/dashboard/upload")({
 
 interface FileItem {
   file: File;
-  preview: string;
+  preview: string | null; // null for PDFs
+  kind: "image" | "pdf";
 }
+
+type Stage =
+  | "idle"
+  | "reading"
+  | "extracting"
+  | "detecting"
+  | "structuring"
+  | "saving"
+  | "done"
+  | "error";
+
+interface ResultSummary {
+  bankId: string;
+  count: number;
+  flagged: number;
+}
+
+const STAGES: { key: Stage; label: string }[] = [
+  { key: "reading", label: "Reading files" },
+  { key: "extracting", label: "Extracting text & vision" },
+  { key: "detecting", label: "Detecting answer markers" },
+  { key: "structuring", label: "Structuring questions" },
+  { key: "saving", label: "Saving to database" },
+];
+
+const MAX_FILES = 20;
+const MAX_BYTES = 25 * 1024 * 1024; // 25 MB per file
 
 function UploadPage() {
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<Stage>("idle");
+  const [result, setResult] = useState<ResultSummary | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files;
-    if (!list) return;
+  const busy = stage !== "idle" && stage !== "done" && stage !== "error";
+
+  const addFiles = useCallback((list: FileList | File[]) => {
     const next: FileItem[] = [];
     for (const f of Array.from(list)) {
-      if (!f.type.startsWith("image/")) continue;
-      if (f.size > 8 * 1024 * 1024) {
-        toast.error(`${f.name} is larger than 8MB`);
+      const isImage = f.type.startsWith("image/");
+      const isPdf = f.type === "application/pdf";
+      if (!isImage && !isPdf) {
+        toast.error(`${f.name}: only PDF or image files`);
         continue;
       }
-      next.push({ file: f, preview: URL.createObjectURL(f) });
+      if (f.size > MAX_BYTES) {
+        toast.error(`${f.name} is larger than 25MB`);
+        continue;
+      }
+      next.push({
+        file: f,
+        preview: isImage ? URL.createObjectURL(f) : null,
+        kind: isImage ? "image" : "pdf",
+      });
     }
-    setFiles((prev) => [...prev, ...next]);
+    setFiles((prev) => {
+      const merged = [...prev, ...next];
+      if (merged.length > MAX_FILES) {
+        toast.error(`Maximum ${MAX_FILES} files per upload`);
+        return merged.slice(0, MAX_FILES);
+      }
+      return merged;
+    });
+  }, []);
+
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) addFiles(e.target.files);
     if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files) addFiles(e.dataTransfer.files);
   };
 
   const removeFile = (i: number) => {
     setFiles((prev) => {
-      URL.revokeObjectURL(prev[i].preview);
+      const f = prev[i];
+      if (f.preview) URL.revokeObjectURL(f.preview);
       return prev.filter((_, idx) => idx !== i);
     });
   };
 
-  const toDataUrl = (file: File) =>
+  const fileToBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const r = new FileReader();
-      r.onload = () => resolve(r.result as string);
+      r.onload = () => {
+        const result = r.result as string;
+        // strip "data:mime;base64,"
+        const idx = result.indexOf(",");
+        resolve(idx >= 0 ? result.slice(idx + 1) : result);
+      };
       r.onerror = reject;
       r.readAsDataURL(file);
     });
 
   const submit = async () => {
-    if (!title.trim()) {
-      toast.error("Please enter a bank title");
-      return;
-    }
-    if (files.length === 0) {
-      toast.error("Please add at least one image");
-      return;
-    }
-    setBusy(true);
+    if (!title.trim()) return toast.error("Please enter a bank title");
+    if (files.length === 0) return toast.error("Please add at least one file");
+
+    setResult(null);
+    setStage("reading");
     try {
-      const images = await Promise.all(files.map((f) => toDataUrl(f.file)));
-      const { data, error } = await supabase.functions.invoke(
-        "extract-mcqs",
-        {
-          body: {
-            images,
-            bankTitle: title.trim(),
-            subject: subject.trim() || null,
-          },
-        }
+      const payloadFiles = await Promise.all(
+        files.map(async (f) => ({
+          name: f.file.name,
+          mimeType: f.file.type,
+          data: await fileToBase64(f.file),
+        }))
       );
-      if (error) throw error;
-      toast.success(`Extracted ${data.count} questions`);
-      void navigate({
-        to: "/dashboard/banks/$bankId",
-        params: { bankId: data.bankId },
+
+      // Visual progression — actual processing is one round-trip server-side
+      setStage("extracting");
+      // brief stage cosmetics so the user sees progress
+      const cosmetic = (s: Stage, ms: number) =>
+        new Promise<void>((res) => {
+          setStage(s);
+          setTimeout(res, ms);
+        });
+      // start the network request immediately
+      const requestPromise = supabase.functions.invoke("extract-mcqs", {
+        body: {
+          files: payloadFiles,
+          bankTitle: title.trim(),
+          subject: subject.trim() || null,
+        },
       });
+
+      // Cycle through cosmetic stages while the request runs (in parallel)
+      void (async () => {
+        await cosmetic("detecting", 1200);
+        await cosmetic("structuring", 1200);
+        setStage("saving");
+      })();
+
+      const { data, error } = await requestPromise;
+      if (error) throw error;
+
+      setStage("done");
+      setResult({
+        bankId: data.bankId,
+        count: data.count,
+        flagged: data.flagged ?? 0,
+      });
+      toast.success(`Extracted ${data.count} questions`);
     } catch (e) {
+      setStage("error");
       const msg = e instanceof Error ? e.message : "Upload failed";
       toast.error(msg);
-    } finally {
-      setBusy(false);
     }
   };
+
+  const reset = () => {
+    files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
+    setFiles([]);
+    setTitle("");
+    setSubject("");
+    setStage("idle");
+    setResult(null);
+  };
+
+  // Result screen
+  if (stage === "done" && result) {
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Upload complete
+          </h1>
+        </header>
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-success">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">
+                {result.count} questions extracted
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {result.count - result.flagged} answers detected automatically
+                {result.flagged > 0 && ` · ${result.flagged} flagged for review`}
+              </p>
+            </div>
+          </div>
+
+          {result.flagged > 0 && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <div>
+                <p className="font-medium text-foreground">
+                  {result.flagged}{" "}
+                  {result.flagged === 1 ? "question needs" : "questions need"}{" "}
+                  review
+                </p>
+                <p className="mt-0.5 text-muted-foreground">
+                  Low-confidence detections — open the bank to verify and edit
+                  the correct answers before publishing.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-5">
+            <Button
+              onClick={() =>
+                navigate({
+                  to: "/dashboard/banks/$bankId",
+                  params: { bankId: result.bankId },
+                })
+              }
+            >
+              Open bank
+              <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Button>
+            <Button variant="outline" onClick={reset}>
+              Upload more
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -101,7 +266,8 @@ function UploadPage() {
           Upload MCQs
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Photos or scans — MedAI extracts every question and embeds diagrams.
+          PDFs or photos — MedAI extracts questions, detects ticked / starred /
+          highlighted answers, and embeds diagrams.
         </p>
       </header>
 
@@ -130,23 +296,36 @@ function UploadPage() {
         </div>
 
         <div className="mt-5">
-          <Label>Images</Label>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={busy}
-            className="mt-1.5 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/40 px-6 py-10 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:opacity-50"
+          <Label>Files</Label>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+            onClick={() => !busy && inputRef.current?.click()}
+            className={cn(
+              "mt-1.5 flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed bg-muted/40 px-6 py-10 text-sm text-muted-foreground transition-colors",
+              dragOver
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50 hover:bg-primary/5",
+              busy && "cursor-not-allowed opacity-50"
+            )}
           >
-            <ImagePlus className="h-6 w-6 text-primary" />
+            <Upload className="h-6 w-6 text-primary" />
             <span className="font-medium text-foreground">
-              Click to add MCQ images
+              Drop PDFs or images here
             </span>
-            <span className="text-xs">PNG, JPG up to 8MB each</span>
-          </button>
+            <span className="text-xs">
+              Or click to browse · PDF / PNG / JPG · up to 25MB each · max{" "}
+              {MAX_FILES} files
+            </span>
+          </div>
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             multiple
             className="hidden"
             onChange={onPick}
@@ -154,48 +333,119 @@ function UploadPage() {
         </div>
 
         {files.length > 0 && (
-          <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+          <ul className="mt-4 space-y-2">
             {files.map((f, i) => (
-              <div
+              <li
                 key={i}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+                className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-2.5"
               >
-                <img
-                  src={f.preview}
-                  alt={`Upload ${i + 1}`}
-                  className="h-full w-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeFile(i)}
-                  disabled={busy}
-                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
+                {f.kind === "image" && f.preview ? (
+                  <img
+                    src={f.preview}
+                    alt={f.file.name}
+                    className="h-12 w-12 rounded object-cover"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded bg-primary/10 text-primary">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {f.file.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {f.kind === "pdf" ? "PDF" : "Image"} ·{" "}
+                    {(f.file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+                {!busy && (
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </li>
             ))}
+          </ul>
+        )}
+
+        {busy && (
+          <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Processing
+            </p>
+            <ul className="mt-3 space-y-2">
+              {STAGES.map((s) => {
+                const idx = STAGES.findIndex((x) => x.key === s.key);
+                const currentIdx = STAGES.findIndex((x) => x.key === stage);
+                const status =
+                  idx < currentIdx
+                    ? "done"
+                    : idx === currentIdx
+                      ? "active"
+                      : "pending";
+                return (
+                  <li
+                    key={s.key}
+                    className="flex items-center gap-2.5 text-sm"
+                  >
+                    {status === "done" ? (
+                      <CheckCircle2 className="h-4 w-4 text-success" />
+                    ) : status === "active" ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    ) : (
+                      <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+                    )}
+                    <span
+                      className={cn(
+                        status === "active"
+                          ? "font-medium text-foreground"
+                          : status === "done"
+                            ? "text-muted-foreground"
+                            : "text-muted-foreground/60"
+                      )}
+                    >
+                      {s.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
 
         <div className="mt-6 flex items-center justify-between gap-4 border-t border-border pt-5">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Powered by Gemini Vision + Wikimedia
+            Gemini Vision · marker detection · Wikimedia diagrams
           </div>
-          <Button onClick={submit} disabled={busy || files.length === 0}>
-            {busy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Extracting…
-              </>
-            ) : (
-              <>
-                <Upload className="mr-2 h-4 w-4" />
-                Extract & save
-              </>
+          <div className="flex gap-2">
+            {stage === "error" && (
+              <Button variant="outline" onClick={() => setStage("idle")}>
+                Try again
+              </Button>
             )}
-          </Button>
+            <Button
+              onClick={submit}
+              disabled={busy || files.length === 0 || !title.trim()}
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing…
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Extract & save
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
