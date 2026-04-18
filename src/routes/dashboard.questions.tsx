@@ -681,6 +681,7 @@ function EditDialog({
         options: parsed.data.options,
         correct_answers: parsed.data.correct_answers,
         explanation: parsed.data.explanation,
+        needs_review: false,
       })
       .eq("id", q.id);
     setSaving(false);
