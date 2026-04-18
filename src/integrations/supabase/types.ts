@@ -193,6 +193,7 @@ export type Database = {
           reference: string | null
           stem: string
           tags: string[] | null
+          type: Database["public"]["Enums"]["question_type"]
           updated_at: string
         }
         Insert: {
@@ -209,6 +210,7 @@ export type Database = {
           reference?: string | null
           stem: string
           tags?: string[] | null
+          type?: Database["public"]["Enums"]["question_type"]
           updated_at?: string
         }
         Update: {
@@ -225,6 +227,7 @@ export type Database = {
           reference?: string | null
           stem?: string
           tags?: string[] | null
+          type?: Database["public"]["Enums"]["question_type"]
           updated_at?: string
         }
         Relationships: [
@@ -276,6 +279,7 @@ export type Database = {
       app_role: "admin" | "user" | "super_admin" | "doctor" | "student"
       attempt_status: "in_progress" | "completed" | "abandoned"
       question_difficulty: "easy" | "medium" | "hard"
+      question_type: "SBA" | "TRUE_FALSE"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -406,6 +410,7 @@ export const Constants = {
       app_role: ["admin", "user", "super_admin", "doctor", "student"],
       attempt_status: ["in_progress", "completed", "abandoned"],
       question_difficulty: ["easy", "medium", "hard"],
+      question_type: ["SBA", "TRUE_FALSE"],
     },
   },
 } as const
