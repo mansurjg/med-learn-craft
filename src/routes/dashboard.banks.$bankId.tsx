@@ -268,6 +268,17 @@ function QuestionCard({
                 {q.difficulty}
               </span>
             )}
+            {q.needs_review && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                <AlertTriangle className="h-3 w-3 text-warning" />
+                Needs review
+              </span>
+            )}
+            {q.marker_type && q.marker_type !== "none" && q.marker_type !== "unknown" && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                marker · {q.marker_type}
+              </span>
+            )}
             {q.image_url && (
               <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                 <ImageIcon className="h-3 w-3" /> diagram
