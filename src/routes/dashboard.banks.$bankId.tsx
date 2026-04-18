@@ -46,6 +46,9 @@ interface QuestionRow {
   options: OptionShape[];
   correct_answers: string[];
   explanation: string | null;
+  needs_review: boolean;
+  marker_type: string | null;
+  confidence_score: number | null;
 }
 
 interface QState {
@@ -80,7 +83,7 @@ function BankDetail() {
         supabase
           .from("questions")
           .select(
-            "id,position,stem,difficulty,image_url,image_caption,type,options,correct_answers,explanation"
+            "id,position,stem,difficulty,image_url,image_caption,type,options,correct_answers,explanation,needs_review,marker_type,confidence_score"
           )
           .eq("bank_id", bankId)
           .order("position", { ascending: true }),
