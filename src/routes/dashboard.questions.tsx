@@ -45,6 +45,7 @@ import {
   RotateCcw,
   Plus,
   Minus,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -73,6 +74,9 @@ interface QuestionRow {
   explanation: string | null;
   created_at: string;
   updated_at: string;
+  needs_review: boolean;
+  marker_type: string | null;
+  confidence_score: number | null;
   bank?: { id: string; title: string; owner_id: string } | null;
   owner_email?: string | null;
 }
@@ -88,6 +92,7 @@ function QuestionsPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | QType>("all");
+  const [reviewFilter, setReviewFilter] = useState<"all" | "needs_review">("all");
 
   const [viewing, setViewing] = useState<QuestionRow | null>(null);
   const [editing, setEditing] = useState<QuestionRow | null>(null);
@@ -101,7 +106,7 @@ function QuestionsPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debounced, typeFilter]);
+  }, [debounced, typeFilter, reviewFilter]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -113,13 +118,14 @@ function QuestionsPage() {
     let query = supabase
       .from("questions")
       .select(
-        "id,bank_id,position,stem,type,options,correct_answers,explanation,created_at,updated_at,question_banks!inner(id,title,owner_id)",
+        "id,bank_id,position,stem,type,options,correct_answers,explanation,created_at,updated_at,needs_review,marker_type,confidence_score,question_banks!inner(id,title,owner_id)",
         { count: "exact" }
       )
       .order("created_at", { ascending: false })
       .range(from, to);
 
     if (typeFilter !== "all") query = query.eq("type", typeFilter);
+    if (reviewFilter === "needs_review") query = query.eq("needs_review", true);
     if (debounced) query = query.ilike("stem", `%${debounced}%`);
 
     if (!isSuperAdmin) {
@@ -144,6 +150,10 @@ function QuestionsPage() {
       explanation: r.explanation,
       created_at: r.created_at,
       updated_at: r.updated_at,
+      needs_review: (r as { needs_review?: boolean }).needs_review ?? false,
+      marker_type: (r as { marker_type?: string | null }).marker_type ?? null,
+      confidence_score:
+        (r as { confidence_score?: number | null }).confidence_score ?? null,
       bank: r.question_banks
         ? {
             id: (r.question_banks as { id: string }).id,
@@ -156,7 +166,7 @@ function QuestionsPage() {
     setRows(mapped);
     setCount(total ?? 0);
     setLoading(false);
-  }, [user, page, debounced, typeFilter, isSuperAdmin]);
+  }, [user, page, debounced, typeFilter, reviewFilter, isSuperAdmin]);
 
   useEffect(() => {
     void load();
@@ -208,13 +218,25 @@ function QuestionsPage() {
           value={typeFilter}
           onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[140px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
             <SelectItem value="SBA">SBA</SelectItem>
             <SelectItem value="TRUE_FALSE">True / False</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={reviewFilter}
+          onValueChange={(v) => setReviewFilter(v as typeof reviewFilter)}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All status</SelectItem>
+            <SelectItem value="needs_review">Needs review</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -240,6 +262,12 @@ function QuestionsPage() {
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-foreground">
                       {q.type === "TRUE_FALSE" ? "True / False" : "SBA"}
                     </span>
+                    {q.needs_review && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                        <AlertTriangle className="h-3 w-3 text-warning" />
+                        Needs review
+                      </span>
+                    )}
                     {q.bank && (
                       <span className="text-xs text-muted-foreground">
                         · {q.bank.title}
@@ -653,6 +681,7 @@ function EditDialog({
         options: parsed.data.options,
         correct_answers: parsed.data.correct_answers,
         explanation: parsed.data.explanation,
+        needs_review: false,
       })
       .eq("id", q.id);
     setSaving(false);

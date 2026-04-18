@@ -12,6 +12,7 @@ import {
   RotateCcw,
   CheckCircle2,
   XCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,9 @@ interface QuestionRow {
   options: OptionShape[];
   correct_answers: string[];
   explanation: string | null;
+  needs_review: boolean;
+  marker_type: string | null;
+  confidence_score: number | null;
 }
 
 interface QState {
@@ -80,7 +84,7 @@ function BankDetail() {
         supabase
           .from("questions")
           .select(
-            "id,position,stem,difficulty,image_url,image_caption,type,options,correct_answers,explanation"
+            "id,position,stem,difficulty,image_url,image_caption,type,options,correct_answers,explanation,needs_review,marker_type,confidence_score"
           )
           .eq("bank_id", bankId)
           .order("position", { ascending: true }),
@@ -185,6 +189,12 @@ function BankDetail() {
             {questions.length} questions
             {bank.subject ? ` · ${bank.subject}` : ""}
           </p>
+          {questions.some((q) => q.needs_review) && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs font-medium text-foreground">
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+              {questions.filter((q) => q.needs_review).length} flagged for review
+            </div>
+          )}
         </div>
         <Button
           onClick={startExam}
@@ -256,6 +266,17 @@ function QuestionCard({
             {q.difficulty && (
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 {q.difficulty}
+              </span>
+            )}
+            {q.needs_review && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                <AlertTriangle className="h-3 w-3 text-warning" />
+                Needs review
+              </span>
+            )}
+            {q.marker_type && q.marker_type !== "none" && q.marker_type !== "unknown" && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                marker · {q.marker_type}
               </span>
             )}
             {q.image_url && (

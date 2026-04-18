@@ -181,6 +181,7 @@ export type Database = {
       questions: {
         Row: {
           bank_id: string
+          confidence_score: number | null
           correct_answers: string[]
           created_at: string
           difficulty: Database["public"]["Enums"]["question_difficulty"] | null
@@ -188,9 +189,13 @@ export type Database = {
           id: string
           image_caption: string | null
           image_url: string | null
+          marker_type: string | null
+          needs_review: boolean
           options: Json
+          page_number: number | null
           position: number
           reference: string | null
+          source_file: string | null
           stem: string
           tags: string[] | null
           type: Database["public"]["Enums"]["question_type"]
@@ -198,6 +203,7 @@ export type Database = {
         }
         Insert: {
           bank_id: string
+          confidence_score?: number | null
           correct_answers?: string[]
           created_at?: string
           difficulty?: Database["public"]["Enums"]["question_difficulty"] | null
@@ -205,9 +211,13 @@ export type Database = {
           id?: string
           image_caption?: string | null
           image_url?: string | null
+          marker_type?: string | null
+          needs_review?: boolean
           options?: Json
+          page_number?: number | null
           position?: number
           reference?: string | null
+          source_file?: string | null
           stem: string
           tags?: string[] | null
           type?: Database["public"]["Enums"]["question_type"]
@@ -215,6 +225,7 @@ export type Database = {
         }
         Update: {
           bank_id?: string
+          confidence_score?: number | null
           correct_answers?: string[]
           created_at?: string
           difficulty?: Database["public"]["Enums"]["question_difficulty"] | null
@@ -222,9 +233,13 @@ export type Database = {
           id?: string
           image_caption?: string | null
           image_url?: string | null
+          marker_type?: string | null
+          needs_review?: boolean
           options?: Json
+          page_number?: number | null
           position?: number
           reference?: string | null
+          source_file?: string | null
           stem?: string
           tags?: string[] | null
           type?: Database["public"]["Enums"]["question_type"]
@@ -233,6 +248,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "questions_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "question_banks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      upload_logs: {
+        Row: {
+          bank_id: string | null
+          created_at: string
+          error_message: string | null
+          file_name: string
+          file_type: string
+          flagged_count: number
+          id: string
+          page_count: number | null
+          processing_status: string
+          question_count: number
+          updated_at: string
+          uploader_id: string
+        }
+        Insert: {
+          bank_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_name: string
+          file_type: string
+          flagged_count?: number
+          id?: string
+          page_count?: number | null
+          processing_status?: string
+          question_count?: number
+          updated_at?: string
+          uploader_id: string
+        }
+        Update: {
+          bank_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_name?: string
+          file_type?: string
+          flagged_count?: number
+          id?: string
+          page_count?: number | null
+          processing_status?: string
+          question_count?: number
+          updated_at?: string
+          uploader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_logs_bank_id_fkey"
             columns: ["bank_id"]
             isOneToOne: false
             referencedRelation: "question_banks"
