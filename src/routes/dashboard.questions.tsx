@@ -73,6 +73,9 @@ interface QuestionRow {
   explanation: string | null;
   created_at: string;
   updated_at: string;
+  needs_review: boolean;
+  marker_type: string | null;
+  confidence_score: number | null;
   bank?: { id: string; title: string; owner_id: string } | null;
   owner_email?: string | null;
 }
@@ -88,6 +91,7 @@ function QuestionsPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | QType>("all");
+  const [reviewFilter, setReviewFilter] = useState<"all" | "needs_review">("all");
 
   const [viewing, setViewing] = useState<QuestionRow | null>(null);
   const [editing, setEditing] = useState<QuestionRow | null>(null);
@@ -101,7 +105,7 @@ function QuestionsPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debounced, typeFilter]);
+  }, [debounced, typeFilter, reviewFilter]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -113,13 +117,14 @@ function QuestionsPage() {
     let query = supabase
       .from("questions")
       .select(
-        "id,bank_id,position,stem,type,options,correct_answers,explanation,created_at,updated_at,question_banks!inner(id,title,owner_id)",
+        "id,bank_id,position,stem,type,options,correct_answers,explanation,created_at,updated_at,needs_review,marker_type,confidence_score,question_banks!inner(id,title,owner_id)",
         { count: "exact" }
       )
       .order("created_at", { ascending: false })
       .range(from, to);
 
     if (typeFilter !== "all") query = query.eq("type", typeFilter);
+    if (reviewFilter === "needs_review") query = query.eq("needs_review", true);
     if (debounced) query = query.ilike("stem", `%${debounced}%`);
 
     if (!isSuperAdmin) {
@@ -144,6 +149,10 @@ function QuestionsPage() {
       explanation: r.explanation,
       created_at: r.created_at,
       updated_at: r.updated_at,
+      needs_review: (r as { needs_review?: boolean }).needs_review ?? false,
+      marker_type: (r as { marker_type?: string | null }).marker_type ?? null,
+      confidence_score:
+        (r as { confidence_score?: number | null }).confidence_score ?? null,
       bank: r.question_banks
         ? {
             id: (r.question_banks as { id: string }).id,
@@ -156,7 +165,7 @@ function QuestionsPage() {
     setRows(mapped);
     setCount(total ?? 0);
     setLoading(false);
-  }, [user, page, debounced, typeFilter, isSuperAdmin]);
+  }, [user, page, debounced, typeFilter, reviewFilter, isSuperAdmin]);
 
   useEffect(() => {
     void load();
