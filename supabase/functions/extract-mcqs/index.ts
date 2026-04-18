@@ -226,20 +226,29 @@ Deno.serve(async (req) => {
     }
     const [bank] = await bankResp.json();
 
-    const rows = questions.map((q, i) => ({
-      bank_id: bank.id,
-      position: i + 1,
-      stem: q.stem,
-      options: q.options,
-      correct_answers: q.correct_answers,
-      explanation: q.explanation ?? null,
-      difficulty: q.difficulty ?? null,
-      reference: q.reference ?? null,
-      image_url:
-        (q as unknown as { _image_url?: string })._image_url ?? null,
-      image_caption:
-        (q as unknown as { _image_caption?: string })._image_caption ?? null,
-    }));
+    const rows = questions.map((q, i) => {
+      const opts = Array.isArray(q.options) ? q.options : [];
+      const isTF =
+        opts.length === 2 &&
+        opts.every((o) =>
+          ["true", "false"].includes(String(o.text ?? "").trim().toLowerCase())
+        );
+      return {
+        bank_id: bank.id,
+        position: i + 1,
+        stem: q.stem,
+        type: isTF ? "TRUE_FALSE" : "SBA",
+        options: q.options,
+        correct_answers: q.correct_answers,
+        explanation: q.explanation ?? null,
+        difficulty: q.difficulty ?? null,
+        reference: q.reference ?? null,
+        image_url:
+          (q as unknown as { _image_url?: string })._image_url ?? null,
+        image_caption:
+          (q as unknown as { _image_caption?: string })._image_caption ?? null,
+      };
+    });
 
     const qResp = await fetch(`${supabaseUrl}/rest/v1/questions`, {
       method: "POST",
