@@ -45,6 +45,7 @@ import {
   RotateCcw,
   Plus,
   Minus,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -261,6 +262,12 @@ function QuestionsPage() {
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-foreground">
                       {q.type === "TRUE_FALSE" ? "True / False" : "SBA"}
                     </span>
+                    {q.needs_review && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                        <AlertTriangle className="h-3 w-3 text-warning" />
+                        Needs review
+                      </span>
+                    )}
                     {q.bank && (
                       <span className="text-xs text-muted-foreground">
                         · {q.bank.title}
