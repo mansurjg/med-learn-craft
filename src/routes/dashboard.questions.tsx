@@ -217,13 +217,25 @@ function QuestionsPage() {
           value={typeFilter}
           onValueChange={(v) => setTypeFilter(v as typeof typeFilter)}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[140px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
             <SelectItem value="SBA">SBA</SelectItem>
             <SelectItem value="TRUE_FALSE">True / False</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={reviewFilter}
+          onValueChange={(v) => setReviewFilter(v as typeof reviewFilter)}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All status</SelectItem>
+            <SelectItem value="needs_review">Needs review</SelectItem>
           </SelectContent>
         </Select>
       </div>
