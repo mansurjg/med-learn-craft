@@ -187,7 +187,7 @@ function AdminPage() {
         <Button
           onClick={handleDownload}
           disabled={downloading}
-          className="gap-2"
+          className="w-full gap-2 sm:w-auto"
         >
           {downloading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
