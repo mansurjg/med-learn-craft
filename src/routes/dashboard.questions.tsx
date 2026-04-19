@@ -46,10 +46,12 @@ import {
   Plus,
   Minus,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
+import { downloadFullQuestionBank } from "@/lib/export-questions";
 
 export const Route = createFileRoute("/dashboard/questions")({
   head: () => ({ meta: [{ title: "All questions — MedAI" }] }),
@@ -98,6 +100,25 @@ function QuestionsPage() {
   const [editing, setEditing] = useState<QuestionRow | null>(null);
   const [testing, setTesting] = useState<QuestionRow | null>(null);
   const [deleting, setDeleting] = useState<QuestionRow | null>(null);
+  const [confirmDownload, setConfirmDownload] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!user) return;
+    setDownloading(true);
+    try {
+      const { count, fileName } = await downloadFullQuestionBank(user.id);
+      toast.success(`Exported ${count} questions`, { description: fileName });
+      setConfirmDownload(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Export failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -191,7 +212,7 @@ function QuestionsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             All questions
@@ -202,6 +223,20 @@ function QuestionsPage() {
               : "Questions from banks you own."}
           </p>
         </div>
+        {isStaff && (
+          <Button
+            onClick={() => setConfirmDownload(true)}
+            disabled={downloading}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloading ? "Preparing…" : "Download Full Question Bank"}
+          </Button>
+        )}
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -382,6 +417,39 @@ function QuestionsPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmDownload}
+        onOpenChange={(o) => !downloading && setConfirmDownload(o)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Download entire question bank as Excel?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This exports every question across all banks into a single .xlsx
+              file. The activity will be logged.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={downloading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDownload();
+              }}
+              disabled={downloading}
+              className="gap-2"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {downloading ? "Preparing…" : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
