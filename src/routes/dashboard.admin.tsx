@@ -39,11 +39,24 @@ interface BankStat {
 }
 
 function AdminPage() {
-  const { user, isStaff, isLoading } = useAuth();
+  const { user, roles, isStaff, isAdmin, isSuperAdmin, isLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [topBanks, setTopBanks] = useState<BankStat[]>([]);
   const [downloading, setDownloading] = useState(false);
+
+  // Debug: surface auth state so admins can verify role detection
+  useEffect(() => {
+    console.log("[AdminPage] auth state", {
+      userId: user?.id,
+      email: user?.email,
+      roles,
+      isAdmin,
+      isSuperAdmin,
+      isStaff,
+      isLoading,
+    });
+  }, [user, roles, isAdmin, isSuperAdmin, isStaff, isLoading]);
 
   const handleDownload = async () => {
     if (!user) return;
@@ -127,7 +140,14 @@ function AdminPage() {
     };
   }, [isStaff]);
 
-  if (isLoading) return null;
+  // Wait for both session AND roles to load before deciding access
+  if (isLoading || (user && roles.length === 0)) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isStaff) {
     return (
@@ -167,7 +187,7 @@ function AdminPage() {
         <Button
           onClick={handleDownload}
           disabled={downloading}
-          className="gap-2"
+          className="w-full gap-2 sm:w-auto"
         >
           {downloading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
