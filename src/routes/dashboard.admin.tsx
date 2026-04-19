@@ -140,7 +140,14 @@ function AdminPage() {
     };
   }, [isStaff]);
 
-  if (isLoading) return null;
+  // Wait for both session AND roles to load before deciding access
+  if (isLoading || (user && roles.length === 0)) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isStaff) {
     return (
