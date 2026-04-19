@@ -212,7 +212,7 @@ function QuestionsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             All questions
@@ -223,6 +223,20 @@ function QuestionsPage() {
               : "Questions from banks you own."}
           </p>
         </div>
+        {isStaff && (
+          <Button
+            onClick={() => setConfirmDownload(true)}
+            disabled={downloading}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloading ? "Preparing…" : "Download Full Question Bank"}
+          </Button>
+        )}
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
