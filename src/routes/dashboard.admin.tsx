@@ -39,11 +39,24 @@ interface BankStat {
 }
 
 function AdminPage() {
-  const { user, isStaff, isLoading } = useAuth();
+  const { user, roles, isStaff, isAdmin, isSuperAdmin, isLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [topBanks, setTopBanks] = useState<BankStat[]>([]);
   const [downloading, setDownloading] = useState(false);
+
+  // Debug: surface auth state so admins can verify role detection
+  useEffect(() => {
+    console.log("[AdminPage] auth state", {
+      userId: user?.id,
+      email: user?.email,
+      roles,
+      isAdmin,
+      isSuperAdmin,
+      isStaff,
+      isLoading,
+    });
+  }, [user, roles, isAdmin, isSuperAdmin, isStaff, isLoading]);
 
   const handleDownload = async () => {
     if (!user) return;
