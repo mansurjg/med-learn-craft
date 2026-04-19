@@ -1,8 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldCheck, Lock, Loader2, Users, BookOpen, Activity, TrendingUp } from "lucide-react";
+import { downloadFullQuestionBank } from "@/lib/export-questions";
+import { Button } from "@/components/ui/button";
+import {
+  ShieldCheck,
+  Lock,
+  Loader2,
+  Users,
+  BookOpen,
+  Activity,
+  TrendingUp,
+  Download,
+} from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin")({
   head: () => ({
@@ -27,10 +39,27 @@ interface BankStat {
 }
 
 function AdminPage() {
-  const { isStaff, isLoading } = useAuth();
+  const { user, isStaff, isLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [topBanks, setTopBanks] = useState<BankStat[]>([]);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!user) return;
+    setDownloading(true);
+    try {
+      const { count, fileName } = await downloadFullQuestionBank(user.id);
+      toast.success(`Exported ${count} questions`, { description: fileName });
+    } catch (err) {
+      console.error(err);
+      toast.error("Export failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     if (!isStaff) return;
@@ -118,21 +147,35 @@ function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center gap-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-primary-foreground"
-          style={{ background: "var(--gradient-primary)" }}
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-primary-foreground"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Admin
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Platform analytics and content overview.
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="gap-2"
         >
-          <ShieldCheck className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Admin
-          </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Platform analytics and content overview.
-          </p>
-        </div>
+          {downloading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {downloading ? "Preparing…" : "Download Full Question Bank"}
+        </Button>
       </header>
 
       {loading ? (
