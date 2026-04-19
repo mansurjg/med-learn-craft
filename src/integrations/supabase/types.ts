@@ -59,6 +59,33 @@ export type Database = {
           },
         ]
       }
+      download_logs: {
+        Row: {
+          created_at: string
+          download_type: string
+          file_name: string | null
+          id: string
+          question_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          download_type: string
+          file_name?: string | null
+          id?: string
+          question_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          download_type?: string
+          file_name?: string | null
+          id?: string
+          question_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       exam_attempts: {
         Row: {
           bank_id: string
