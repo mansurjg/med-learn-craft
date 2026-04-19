@@ -100,6 +100,25 @@ function QuestionsPage() {
   const [editing, setEditing] = useState<QuestionRow | null>(null);
   const [testing, setTesting] = useState<QuestionRow | null>(null);
   const [deleting, setDeleting] = useState<QuestionRow | null>(null);
+  const [confirmDownload, setConfirmDownload] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!user) return;
+    setDownloading(true);
+    try {
+      const { count, fileName } = await downloadFullQuestionBank(user.id);
+      toast.success(`Exported ${count} questions`, { description: fileName });
+      setConfirmDownload(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Export failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
