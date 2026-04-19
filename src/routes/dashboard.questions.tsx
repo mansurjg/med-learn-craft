@@ -46,10 +46,12 @@ import {
   Plus,
   Minus,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
+import { downloadFullQuestionBank } from "@/lib/export-questions";
 
 export const Route = createFileRoute("/dashboard/questions")({
   head: () => ({ meta: [{ title: "All questions — MedAI" }] }),
