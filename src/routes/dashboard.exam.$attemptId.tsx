@@ -351,6 +351,11 @@ function ExamRunner() {
           );
         })}
       </div>
+
+      {/* Engine credit */}
+      <p className="pt-4 text-center text-xs italic text-muted-foreground">
+        AI Engine developed by Dr. Mansur Bin Anowar
+      </p>
     </div>
   );
 }
