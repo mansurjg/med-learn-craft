@@ -37,8 +37,10 @@ type Stage =
   | "idle"
   | "reading"
   | "extracting"
-  | "detecting"
-  | "structuring"
+  | "rewriting"
+  | "explanations"
+  | "images"
+  | "formatting"
   | "saving"
   | "done"
   | "error";
@@ -49,11 +51,13 @@ interface ResultSummary {
   flagged: number;
 }
 
-const STAGES: { key: Stage; label: string }[] = [
+const STAGE_BASE: { key: Stage; label: string }[] = [
   { key: "reading", label: "Reading files" },
-  { key: "extracting", label: "Extracting text & vision" },
-  { key: "detecting", label: "Detecting answer markers" },
-  { key: "structuring", label: "Structuring questions" },
+  { key: "extracting", label: "Extracting questions" },
+  { key: "rewriting", label: "Rewriting scenarios" },
+  { key: "explanations", label: "Generating explanations" },
+  { key: "images", label: "Searching open-license images" },
+  { key: "formatting", label: "Final formatting" },
   { key: "saving", label: "Saving to database" },
 ];
 
