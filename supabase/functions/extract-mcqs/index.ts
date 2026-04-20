@@ -91,7 +91,7 @@ Keep total length tight (~120-220 words). No fluff. No diagram description.
    Use ONLY: Gray's Anatomy, Snell's Clinical Neuroanatomy, Moore's Clinically Oriented Anatomy, Bailey & Love, Harrison's Principles of Internal Medicine, Robbins Pathology.
    Format each item as "<Book> — <chapter or topic>". Do NOT fabricate page numbers. Omit references entirely if none clearly apply.
 
-8. DIAGRAM — if the concept is best understood with an anatomy / histology / radiology / ECG image, set needs_image=true and image_query to a precise English search term ("cranial nerve foramina labeled", "ECG anterior STEMI"). Do NOT describe the diagram in the explanation.
+8. DIAGRAM — ALWAYS provide image_query for EVERY question (regardless of subject). Set needs_image=true for every question and produce a precise English Wikimedia-style search term that best illustrates the concept (e.g. "cranial nerve foramina labeled", "ECG anterior STEMI", "nephron diagram labeled", "Streptococcus pneumoniae gram stain", "femoral triangle anatomy"). Prefer anatomy / histology / radiology / pathology / micrograph / ECG / labeled diagram terms. Do NOT describe the diagram in the explanation.
 
 9. NEVER guess answers when there is no marker. Leave correct_answers empty.
 
@@ -418,11 +418,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Enrich with diagrams (parallel, capped). If no open-licensed image found,
-    // mark needs_image=true so admins can attach manually.
+    // Enrich EVERY question with an open-license diagram. Search runs for all
+    // questions regardless of the rewrite toggle. If no open-licensed image is
+    // found, mark needs_image=true so admins can attach manually.
     const imageJobs = questions
       .map((q, idx) => ({ q, idx }))
-      .filter(({ q }) => q.needs_image && q.image_query);
+      .filter(({ q }) => {
+        // Force-enable image search for every question; fall back to stem keywords
+        // when the model didn't supply image_query.
+        if (!q.image_query || !q.image_query.trim()) {
+          q.image_query = (q.stem || "").replace(/\s+/g, " ").trim().slice(0, 120);
+        }
+        q.needs_image = true;
+        return Boolean(q.image_query);
+      });
     await Promise.all(
       imageJobs.map(async ({ q }) => {
         const found = await searchWikimedia(q.image_query!);

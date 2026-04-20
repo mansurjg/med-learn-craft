@@ -186,6 +186,16 @@ export async function downloadFullQuestionBank(userId: string): Promise<{
     row.alignment = { vertical: "top", wrapText: true };
   });
 
+  // Footer credit row
+  ws.addRow({});
+  const footerRow = ws.addRow({
+    sn: "",
+    subject: "AI Engine developed by Dr. Mansur Bin Anowar",
+  });
+  ws.mergeCells(`B${footerRow.number}:L${footerRow.number}`);
+  footerRow.font = { italic: true, bold: true, color: { argb: "FF374151" } };
+  footerRow.alignment = { vertical: "middle", horizontal: "center" };
+
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
