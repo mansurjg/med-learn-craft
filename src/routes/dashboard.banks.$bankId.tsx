@@ -47,9 +47,28 @@ interface QuestionRow {
   options: OptionShape[];
   correct_answers: string[];
   explanation: string | null;
+  reference: string | null;
   needs_review: boolean;
   marker_type: string | null;
   confidence_score: number | null;
+}
+
+// Parse "Title — Source: Wikimedia Commons (CC BY-SA 4.0) · https://..." into parts.
+function parseCaption(raw: string | null): {
+  title: string;
+  license: string | null;
+  source: string | null;
+  url: string | null;
+} {
+  if (!raw) return { title: "", license: null, source: null, url: null };
+  const urlMatch = raw.match(/(https?:\/\/\S+)/);
+  const url = urlMatch ? urlMatch[1] : null;
+  const licenseMatch = raw.match(/\(([^)]+)\)/);
+  const license = licenseMatch ? licenseMatch[1] : null;
+  const sourceMatch = raw.match(/Source:\s*([^(·]+)/i);
+  const source = sourceMatch ? sourceMatch[1].trim() : null;
+  const title = raw.split(/\s+—\s+/)[0]?.trim() || raw;
+  return { title, license, source, url };
 }
 
 interface QState {
