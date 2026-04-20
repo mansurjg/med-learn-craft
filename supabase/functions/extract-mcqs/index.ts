@@ -1,13 +1,17 @@
-// Phase 2: Extract MCQs from images & PDFs using Gemini Vision.
-// Detects answer markers (tick / star / bold / underline / highlight / circle / "Correct" text),
-// auto-enriches with diagrams from Wikimedia, writes upload_logs, and flags low-confidence rows.
+// Phase 3: Extract MCQs from images & PDFs using Gemini Vision.
+// - Detects answer markers
+// - Generates structured high-yield explanations + textbook references
+// - Optionally rewrites scenarios to avoid copyright (preserving concept/answer)
+// - Auto-attaches open-license diagrams from Wikimedia Commons w/ source + license
+// - Flags low-confidence rows AND questions needing a manual image
 //
 // Input: {
-//   files: { name: string; mimeType: string; data: string /* base64 (no data:url prefix) */ }[],
+//   files: { name: string; mimeType: string; data: string /* base64 */ }[],
 //   bankTitle: string,
-//   subject?: string
+//   subject?: string,
+//   rewriteScenario?: boolean
 // }
-// Output: { bankId: string, count: number, flagged: number, uploadLogId: string }
+// Output: { bankId, count, flagged, uploadLogId }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +25,7 @@ interface ExtractedQuestion {
   correct_answers: string[];
   explanation?: string;
   difficulty?: "easy" | "medium" | "hard";
-  reference?: string;
+  references?: string[]; // e.g. ["Gray's Anatomy — Cranial Nerves", "Snell — Cranial Nerves"]
   page_number?: number;
   marker_type?:
     | "tick"
@@ -38,64 +42,100 @@ interface ExtractedQuestion {
   image_query?: string;
 }
 
-const SYSTEM_PROMPT = `You are an expert medical educator processing MCQ documents (PDFs or photos).
+const SYSTEM_PROMPT_BASE = `You are an expert medical educator processing MCQ documents (PDFs or photos).
 
 CORE RULES — follow strictly:
 
-1. Maintain the ORIGINAL question sequence. Set page_number for each question if you can infer it.
+1. Maintain the ORIGINAL question sequence. Set page_number per question if you can infer it.
 2. Correct OCR errors silently — do NOT change medical meaning.
-3. Detect and separate every MCQ on every page. Do not merge or skip questions.
+3. Detect and separate every MCQ. Do not merge or skip.
 
 4. ANSWER MARKER DETECTION — for each question, look for indicators next to one or more options:
-   - The word "Correct", "Ans", "Answer", "Key", "(✓)" written beside an option
-   - Tick marks: ✔ ✓ ☑
-   - Stars: * ★ ⭐
-   - Bold or underlined text on an option
-   - Highlighting (background color) on an option
+   - The word "Correct", "Ans", "Answer", "Key", "(✓)" beside an option
+   - Tick marks: ✔ ✓ ☑ · Stars: * ★ ⭐
+   - Bold or underlined option text
+   - Highlighting (background colour)
    - Circle / box drawn around an option letter
    - Hand-drawn arrows pointing at an option
    Map each marker to the matching option id (a, b, c, d, e). Allow MULTIPLE correct answers if multiple markers exist.
-   STRIP the marker characters/words from the final option text — output only the clean option text.
-   Set marker_type to one of: tick | star | bold | underline | highlight | circle | text | none | unknown.
-   If NO marker is found, set correct_answers = [], marker_type = "none".
+   STRIP marker characters/words from the final option text — output only the clean option text.
+   Set marker_type ∈ tick | star | bold | underline | highlight | circle | text | none | unknown.
+   If NO marker found, correct_answers = [], marker_type = "none".
 
-5. CONFIDENCE — set confidence_score between 0 and 1:
-   - 1.0 = clear marker, clean OCR
-   - 0.7 = marker present but ambiguous (two markers, partial occlusion)
-   - 0.4 = OCR uncertain or marker unclear
-   - 0.0 = no marker found
-   Anything below 0.6 will be flagged for human review.
+5. CONFIDENCE — set confidence_score 0..1:
+   - 1.0 clear marker, clean OCR
+   - 0.7 marker present but ambiguous
+   - 0.4 OCR uncertain
+   - 0.0 no marker
+   < 0.6 will be flagged for human review.
 
-6. EXPLANATION — short, high-yield only. Reference Gray's, Snell, Bailey & Love, Harrison's only when they add value.
+6. EXPLANATION — MUST be structured and exam-oriented. Use this exact format with section headers:
 
-7. DIAGRAM — if the question concept is best understood with an anatomy / histology / radiology / ECG image, set needs_image=true and image_query to a precise search term (e.g. "human heart anatomy labeled chambers"). Do NOT describe the diagram in the explanation.
+Why correct:
+<one or two precise sentences>
 
-8. NEVER guess answers when there is no marker. Just leave correct_answers empty.
+Why others are wrong:
+- (a) <reason>
+- (b) <reason>
+…
+
+Clinical relevance:
+<one or two sentences max>
+
+Memory aid (optional):
+<a mnemonic or pearl, only if genuinely useful>
+
+Keep total length tight (~120-220 words). No fluff. No diagram description.
+
+7. REFERENCES — return as an array of strings in the "references" field. Only include sources that genuinely support the answer.
+   Use ONLY: Gray's Anatomy, Snell's Clinical Neuroanatomy, Moore's Clinically Oriented Anatomy, Bailey & Love, Harrison's Principles of Internal Medicine, Robbins Pathology.
+   Format each item as "<Book> — <chapter or topic>". Do NOT fabricate page numbers. Omit references entirely if none clearly apply.
+
+8. DIAGRAM — if the concept is best understood with an anatomy / histology / radiology / ECG image, set needs_image=true and image_query to a precise English search term ("cranial nerve foramina labeled", "ECG anterior STEMI"). Do NOT describe the diagram in the explanation.
+
+9. NEVER guess answers when there is no marker. Leave correct_answers empty.
 
 Output via the submit_questions function. Be exhaustive — extract EVERY question visible.`;
 
+const REWRITE_ADDENDUM = `
+
+10. COPYRIGHT REWRITE MODE IS ENABLED.
+   For every question, REWRITE the clinical scenario into an entirely original vignette:
+   - Preserve concept, learning point, difficulty, and the correct answer(s)
+   - Change patient age, gender (if possible), setting, presenting numbers, lab values, ethnicity, vocabulary
+   - Do NOT reuse phrasing from the source — rewrite from scratch in clean exam-style English
+   - Options may be re-ordered or re-worded but the correct option must remain the same medical entity
+   - Keep stem length similar to source. No filler.
+   This rule does NOT apply to pure factual MCQs without a clinical vignette — clean OCR only for those.`;
+
 async function extractWithGemini(
-  files: { mimeType: string; data: string }[]
+  files: { mimeType: string; data: string }[],
+  rewriteScenario: boolean
 ): Promise<ExtractedQuestion[]> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
+  const systemPrompt = rewriteScenario
+    ? SYSTEM_PROMPT_BASE + REWRITE_ADDENDUM
+    : SYSTEM_PROMPT_BASE;
+
   const content: Array<Record<string, unknown>> = [
     {
       type: "text",
-      text: "Extract every MCQ from these documents. Detect answer markers carefully.",
+      text: rewriteScenario
+        ? "Extract every MCQ. Rewrite each clinical scenario originally per rule 10. Preserve concept and correct answer."
+        : "Extract every MCQ from these documents. Detect answer markers carefully.",
     },
   ];
   for (const f of files) {
-    // Gemini accepts data URLs for both images and application/pdf
     const url = `data:${f.mimeType};base64,${f.data}`;
     content.push({ type: "image_url", image_url: { url } });
   }
 
   const body = {
-    model: "google/gemini-2.5-pro",
+    model: "google/gemini-3-flash-preview",
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemPrompt },
       { role: "user", content },
     ],
     tools: [
@@ -103,7 +143,7 @@ async function extractWithGemini(
         type: "function",
         function: {
           name: "submit_questions",
-          description: "Return all extracted MCQs with marker detection.",
+          description: "Return all extracted MCQs with marker detection, structured explanations, and references.",
           parameters: {
             type: "object",
             properties: {
@@ -133,7 +173,11 @@ async function extractWithGemini(
                       type: "string",
                       enum: ["easy", "medium", "hard"],
                     },
-                    reference: { type: "string" },
+                    references: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Textbook references like \"Gray's Anatomy — Cranial Nerves\".",
+                    },
                     page_number: { type: "integer" },
                     marker_type: {
                       type: "string",
@@ -191,31 +235,75 @@ async function extractWithGemini(
   return args.questions as ExtractedQuestion[];
 }
 
-async function searchWikimedia(query: string): Promise<string | null> {
+interface WikimediaImage {
+  url: string;
+  descriptionUrl: string;
+  license: string; // human-readable, e.g. "CC BY-SA 4.0", "Public domain"
+  title: string;
+}
+
+const OPEN_LICENSE_REGEX = /(cc[\s-]?by(?:[\s-]?sa)?|creative ?commons|public ?domain|cc0|gfdl)/i;
+
+// Wikimedia Commons API: search files, return first OPEN-licensed result with metadata.
+async function searchWikimedia(query: string): Promise<WikimediaImage | null> {
   try {
     const url = new URL("https://commons.wikimedia.org/w/api.php");
     url.searchParams.set("action", "query");
     url.searchParams.set("format", "json");
     url.searchParams.set("generator", "search");
     url.searchParams.set("gsrsearch", `${query} filetype:bitmap`);
-    url.searchParams.set("gsrlimit", "1");
+    url.searchParams.set("gsrlimit", "5");
     url.searchParams.set("gsrnamespace", "6");
     url.searchParams.set("prop", "imageinfo");
-    url.searchParams.set("iiprop", "url");
-    url.searchParams.set("iiurlwidth", "800");
+    url.searchParams.set("iiprop", "url|extmetadata");
+    url.searchParams.set("iiurlwidth", "900");
+    url.searchParams.set("iiextmetadatafilter", "LicenseShortName|License|UsageTerms");
     url.searchParams.set("origin", "*");
 
     const resp = await fetch(url.toString(), {
-      headers: { "User-Agent": "MedAI-ExamEngine/1.0" },
+      headers: { "User-Agent": "MedAI-ExamEngine/1.0 (https://med-learn-craft.lovable.app)" },
     });
     if (!resp.ok) return null;
     const data = await resp.json();
     const pages = data?.query?.pages;
     if (!pages) return null;
-    const first = Object.values(pages)[0] as {
-      imageinfo?: { thumburl?: string; url?: string }[];
+
+    type Page = {
+      title?: string;
+      imageinfo?: {
+        thumburl?: string;
+        url?: string;
+        descriptionurl?: string;
+        descriptionshorturl?: string;
+        extmetadata?: {
+          LicenseShortName?: { value?: string };
+          License?: { value?: string };
+          UsageTerms?: { value?: string };
+        };
+      }[];
     };
-    return first?.imageinfo?.[0]?.thumburl ?? first?.imageinfo?.[0]?.url ?? null;
+
+    const candidates = Object.values(pages) as Page[];
+    for (const p of candidates) {
+      const info = p.imageinfo?.[0];
+      if (!info) continue;
+      const license =
+        info.extmetadata?.LicenseShortName?.value ||
+        info.extmetadata?.License?.value ||
+        info.extmetadata?.UsageTerms?.value ||
+        "";
+      if (!OPEN_LICENSE_REGEX.test(license)) continue;
+      const fileUrl = info.thumburl || info.url;
+      if (!fileUrl) continue;
+      return {
+        url: fileUrl,
+        descriptionUrl:
+          info.descriptionurl || info.descriptionshorturl || "https://commons.wikimedia.org",
+        license: license.trim(),
+        title: (p.title || "").replace(/^File:/, ""),
+      };
+    }
+    return null;
   } catch (_) {
     return null;
   }
@@ -241,7 +329,6 @@ Deno.serve(async (req) => {
   let userId: string | null = null;
 
   try {
-    // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing auth" }), {
@@ -262,7 +349,6 @@ Deno.serve(async (req) => {
     userId = userData.id as string;
 
     const payload = await req.json();
-    // Backwards compat: accept either { files: [...] } or legacy { images: [dataUrl,...] }
     let files: { name: string; mimeType: string; data: string }[] = [];
     if (Array.isArray(payload.files)) {
       files = payload.files;
@@ -278,6 +364,7 @@ Deno.serve(async (req) => {
     }
     const bankTitle = payload.bankTitle as string;
     const subject = (payload.subject as string | undefined) ?? null;
+    const rewriteScenario = Boolean(payload.rewriteScenario);
 
     if (files.length === 0 || !bankTitle) {
       return new Response(
@@ -298,7 +385,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create upload log row up-front
     const fileNames = files.map((f) => f.name).join(", ").slice(0, 500);
     const fileTypes = Array.from(new Set(files.map((f) => f.mimeType))).join(", ");
     const logResp = await fetch(`${supabaseUrl}/rest/v1/upload_logs`, {
@@ -318,53 +404,42 @@ Deno.serve(async (req) => {
     }
 
     console.log(
-      `extract-mcqs: ${files.length} file(s) for ${userId} (${fileTypes})`
+      `extract-mcqs: ${files.length} file(s) for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
     );
 
-    const questions = await extractWithGemini(files);
+    const questions = await extractWithGemini(files, rewriteScenario);
     console.log(`extract-mcqs: got ${questions.length} questions`);
 
-    // Update log: enrichment phase
     if (uploadLogId) {
-      await fetch(
-        `${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`,
-        {
-          method: "PATCH",
-          headers: adminHeaders,
-          body: JSON.stringify({ processing_status: "enriching" }),
-        }
-      );
+      await fetch(`${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`, {
+        method: "PATCH",
+        headers: adminHeaders,
+        body: JSON.stringify({ processing_status: "enriching" }),
+      });
     }
 
-    // Enrich with diagrams
-    for (const q of questions) {
-      if (q.needs_image && q.image_query) {
-        const url = await searchWikimedia(q.image_query);
-        if (url) {
-          (q as unknown as { _image_url: string })._image_url = url;
-          (q as unknown as { _image_caption: string })._image_caption =
-            q.image_query;
+    // Enrich with diagrams (parallel, capped). If no open-licensed image found,
+    // mark needs_image=true so admins can attach manually.
+    const imageJobs = questions
+      .map((q, idx) => ({ q, idx }))
+      .filter(({ q }) => q.needs_image && q.image_query);
+    await Promise.all(
+      imageJobs.map(async ({ q }) => {
+        const found = await searchWikimedia(q.image_query!);
+        if (found) {
+          (q as unknown as { _image: WikimediaImage })._image = found;
         }
-      }
-    }
+      })
+    );
 
-    // Create the bank
     const bankResp = await fetch(`${supabaseUrl}/rest/v1/question_banks`, {
       method: "POST",
       headers: adminHeaders,
-      body: JSON.stringify({
-        owner_id: userId,
-        title: bankTitle,
-        subject,
-      }),
+      body: JSON.stringify({ owner_id: userId, title: bankTitle, subject }),
     });
-    if (!bankResp.ok) {
-      const t = await bankResp.text();
-      throw new Error(`bank insert: ${t}`);
-    }
+    if (!bankResp.ok) throw new Error(`bank insert: ${await bankResp.text()}`);
     const [bank] = await bankResp.json();
 
-    // Build rows with classification + flagging
     const sourceFile = fileNames.length > 200 ? `${files.length} files` : fileNames;
     let flagged = 0;
 
@@ -373,8 +448,7 @@ Deno.serve(async (req) => {
       const isTF =
         opts.length === 2 &&
         opts.every((o) =>
-          ["true", "false"]
-            .includes(String(o.text ?? "").trim().toLowerCase())
+          ["true", "false"].includes(String(o.text ?? "").trim().toLowerCase())
         );
 
       const conf =
@@ -384,8 +458,27 @@ Deno.serve(async (req) => {
             ? 0.7
             : 0;
       const noAnswer = !q.correct_answers || q.correct_answers.length === 0;
-      const needsReview = conf < CONFIDENCE_THRESHOLD || noAnswer;
+      // Flag if low confidence OR no answer OR an image was needed but not found
+      const img = (q as unknown as { _image?: WikimediaImage })._image;
+      const needsManualImage = Boolean(q.needs_image && !img);
+      const needsReview = conf < CONFIDENCE_THRESHOLD || noAnswer || needsManualImage;
       if (needsReview) flagged++;
+
+      // Caption embeds source + license so we don't need a schema migration
+      const caption = img
+        ? `${img.title || q.image_query} — Source: Wikimedia Commons (${img.license}) · ${img.descriptionUrl}`
+        : null;
+
+      // Reference: join AI-supplied references with newlines
+      const referenceText =
+        q.references && q.references.length > 0
+          ? q.references.filter(Boolean).join("\n")
+          : null;
+
+      // Tags: mark questions that need a manual image so admins can find them
+      const tags: string[] = [];
+      if (needsManualImage) tags.push("needs-image");
+      if (rewriteScenario) tags.push("rewritten");
 
       return {
         bank_id: bank.id,
@@ -396,16 +489,15 @@ Deno.serve(async (req) => {
         correct_answers: q.correct_answers ?? [],
         explanation: q.explanation ?? null,
         difficulty: q.difficulty ?? null,
-        reference: q.reference ?? null,
-        image_url:
-          (q as unknown as { _image_url?: string })._image_url ?? null,
-        image_caption:
-          (q as unknown as { _image_caption?: string })._image_caption ?? null,
+        reference: referenceText,
+        image_url: img?.url ?? null,
+        image_caption: caption,
         source_file: sourceFile,
         page_number: q.page_number ?? null,
         marker_type: q.marker_type ?? (noAnswer ? "none" : "unknown"),
         confidence_score: conf,
         needs_review: needsReview,
+        tags: tags.length ? tags : null,
       };
     });
 
@@ -415,27 +507,20 @@ Deno.serve(async (req) => {
         headers: adminHeaders,
         body: JSON.stringify(rows),
       });
-      if (!qResp.ok) {
-        const t = await qResp.text();
-        throw new Error(`questions insert: ${t}`);
-      }
+      if (!qResp.ok) throw new Error(`questions insert: ${await qResp.text()}`);
     }
 
-    // Mark log as completed
     if (uploadLogId) {
-      await fetch(
-        `${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`,
-        {
-          method: "PATCH",
-          headers: adminHeaders,
-          body: JSON.stringify({
-            bank_id: bank.id,
-            question_count: rows.length,
-            flagged_count: flagged,
-            processing_status: "completed",
-          }),
-        }
-      );
+      await fetch(`${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`, {
+        method: "PATCH",
+        headers: adminHeaders,
+        body: JSON.stringify({
+          bank_id: bank.id,
+          question_count: rows.length,
+          flagged_count: flagged,
+          processing_status: "completed",
+        }),
+      });
     }
 
     return new Response(
@@ -455,17 +540,14 @@ Deno.serve(async (req) => {
     console.error("extract-mcqs error:", msg);
 
     if (uploadLogId) {
-      await fetch(
-        `${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`,
-        {
-          method: "PATCH",
-          headers: adminHeaders,
-          body: JSON.stringify({
-            processing_status: "failed",
-            error_message: msg.slice(0, 500),
-          }),
-        }
-      ).catch(() => {});
+      await fetch(`${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`, {
+        method: "PATCH",
+        headers: adminHeaders,
+        body: JSON.stringify({
+          processing_status: "failed",
+          error_message: msg.slice(0, 500),
+        }),
+      }).catch(() => {});
     }
 
     let status = 500;
