@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Upload,
   Loader2,
@@ -14,6 +15,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -35,8 +37,10 @@ type Stage =
   | "idle"
   | "reading"
   | "extracting"
-  | "detecting"
-  | "structuring"
+  | "rewriting"
+  | "explanations"
+  | "images"
+  | "formatting"
   | "saving"
   | "done"
   | "error";
@@ -47,11 +51,13 @@ interface ResultSummary {
   flagged: number;
 }
 
-const STAGES: { key: Stage; label: string }[] = [
+const STAGE_BASE: { key: Stage; label: string }[] = [
   { key: "reading", label: "Reading files" },
-  { key: "extracting", label: "Extracting text & vision" },
-  { key: "detecting", label: "Detecting answer markers" },
-  { key: "structuring", label: "Structuring questions" },
+  { key: "extracting", label: "Extracting questions" },
+  { key: "rewriting", label: "Rewriting scenarios" },
+  { key: "explanations", label: "Generating explanations" },
+  { key: "images", label: "Searching open-license images" },
+  { key: "formatting", label: "Final formatting" },
   { key: "saving", label: "Saving to database" },
 ];
 
@@ -66,7 +72,12 @@ function UploadPage() {
   const [stage, setStage] = useState<Stage>("idle");
   const [result, setResult] = useState<ResultSummary | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [rewriteScenario, setRewriteScenario] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const STAGES = STAGE_BASE.filter(
+    (s) => s.key !== "rewriting" || rewriteScenario
+  );
 
   const busy = stage !== "idle" && stage !== "done" && stage !== "error";
 
@@ -148,7 +159,6 @@ function UploadPage() {
 
       // Visual progression — actual processing is one round-trip server-side
       setStage("extracting");
-      // brief stage cosmetics so the user sees progress
       const cosmetic = (s: Stage, ms: number) =>
         new Promise<void>((res) => {
           setStage(s);
@@ -160,13 +170,16 @@ function UploadPage() {
           files: payloadFiles,
           bankTitle: title.trim(),
           subject: subject.trim() || null,
+          rewriteScenario,
         },
       });
 
       // Cycle through cosmetic stages while the request runs (in parallel)
       void (async () => {
-        await cosmetic("detecting", 1200);
-        await cosmetic("structuring", 1200);
+        if (rewriteScenario) await cosmetic("rewriting", 1200);
+        await cosmetic("explanations", 1200);
+        await cosmetic("images", 1200);
+        await cosmetic("formatting", 800);
         setStage("saving");
       })();
 
@@ -192,6 +205,7 @@ function UploadPage() {
     setFiles([]);
     setTitle("");
     setSubject("");
+    setRewriteScenario(false);
     setStage("idle");
     setResult(null);
   };
@@ -373,6 +387,34 @@ function UploadPage() {
           </ul>
         )}
 
+        {/* Copyright rewrite toggle */}
+        <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/30 p-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <Label
+                htmlFor="rewrite"
+                className="text-sm font-medium text-foreground"
+              >
+                Rewrite scenarios to avoid copyright
+              </Label>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                AI rewrites each clinical vignette with new patient details,
+                setting and numbers — concept and correct answer stay identical.
+                Pure factual MCQs are kept as-is.
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="rewrite"
+            checked={rewriteScenario}
+            onCheckedChange={setRewriteScenario}
+            disabled={busy}
+          />
+        </div>
+
         {busy && (
           <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -421,7 +463,7 @@ function UploadPage() {
         <div className="mt-6 flex items-center justify-between gap-4 border-t border-border pt-5">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Gemini Vision · marker detection · Wikimedia diagrams
+            Gemini · structured explanations · open-license diagrams · references
           </div>
           <div className="flex gap-2">
             {stage === "error" && (
