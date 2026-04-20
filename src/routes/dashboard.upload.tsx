@@ -463,7 +463,7 @@ function UploadPage() {
         <div className="mt-6 flex items-center justify-between gap-4 border-t border-border pt-5">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Gemini Vision · marker detection · Wikimedia diagrams
+            Gemini · structured explanations · open-license diagrams · references
           </div>
           <div className="flex gap-2">
             {stage === "error" && (
