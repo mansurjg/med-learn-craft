@@ -159,7 +159,6 @@ function UploadPage() {
 
       // Visual progression — actual processing is one round-trip server-side
       setStage("extracting");
-      // brief stage cosmetics so the user sees progress
       const cosmetic = (s: Stage, ms: number) =>
         new Promise<void>((res) => {
           setStage(s);
@@ -171,13 +170,16 @@ function UploadPage() {
           files: payloadFiles,
           bankTitle: title.trim(),
           subject: subject.trim() || null,
+          rewriteScenario,
         },
       });
 
       // Cycle through cosmetic stages while the request runs (in parallel)
       void (async () => {
-        await cosmetic("detecting", 1200);
-        await cosmetic("structuring", 1200);
+        if (rewriteScenario) await cosmetic("rewriting", 1200);
+        await cosmetic("explanations", 1200);
+        await cosmetic("images", 1200);
+        await cosmetic("formatting", 800);
         setStage("saving");
       })();
 
