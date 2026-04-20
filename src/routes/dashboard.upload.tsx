@@ -72,7 +72,12 @@ function UploadPage() {
   const [stage, setStage] = useState<Stage>("idle");
   const [result, setResult] = useState<ResultSummary | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [rewriteScenario, setRewriteScenario] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const STAGES = STAGE_BASE.filter(
+    (s) => s.key !== "rewriting" || rewriteScenario
+  );
 
   const busy = stage !== "idle" && stage !== "done" && stage !== "error";
 
