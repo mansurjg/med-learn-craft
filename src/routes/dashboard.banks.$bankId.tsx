@@ -103,7 +103,7 @@ function BankDetail() {
         supabase
           .from("questions")
           .select(
-            "id,position,stem,difficulty,image_url,image_caption,type,options,correct_answers,explanation,needs_review,marker_type,confidence_score"
+            "id,position,stem,difficulty,image_url,image_caption,type,options,correct_answers,explanation,reference,needs_review,marker_type,confidence_score"
           )
           .eq("bank_id", bankId)
           .order("position", { ascending: true }),
