@@ -418,15 +418,79 @@ function QuestionCard({
         </div>
       </div>
 
-      {/* Explanation */}
-      {revealed && q.explanation && (
-        <div className="mt-4 rounded-xl border border-border bg-muted/40 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Explanation
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-foreground">
-            {q.explanation}
-          </p>
+      {/* Explanation + references + diagram (only after reveal) */}
+      {revealed && (q.explanation || q.image_url || q.reference) && (
+        <div className="mt-4 space-y-4">
+          {q.explanation && (
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Explanation
+              </p>
+              <div className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-foreground">
+                {q.explanation}
+              </div>
+            </div>
+          )}
+
+          {q.image_url && (
+            <figure className="rounded-xl border border-border bg-card p-3">
+              <img
+                src={q.image_url}
+                alt={parseCaption(q.image_caption).title || "Diagram"}
+                loading="lazy"
+                className="mx-auto max-h-80 w-full rounded-lg bg-muted object-contain"
+              />
+              {(() => {
+                const c = parseCaption(q.image_caption);
+                return (
+                  <figcaption className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {c.title}
+                    </span>
+                    {c.source && <> · Source: {c.source}</>}
+                    {c.license && (
+                      <span className="ml-1 inline-flex items-center rounded-full bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">
+                        {c.license}
+                      </span>
+                    )}
+                    {c.url && (
+                      <>
+                        {" · "}
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline-offset-2 hover:underline"
+                        >
+                          View source
+                        </a>
+                      </>
+                    )}
+                  </figcaption>
+                );
+              })()}
+            </figure>
+          )}
+
+          {q.reference && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                References
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-sm leading-relaxed text-foreground">
+                {q.reference
+                  .split(/\r?\n/)
+                  .map((r) => r.trim())
+                  .filter(Boolean)
+                  .map((r, idx) => (
+                    <li key={idx} className="flex gap-2">
+                      <span className="text-primary">•</span>
+                      <span>{r}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </li>
