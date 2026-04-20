@@ -387,6 +387,34 @@ function UploadPage() {
           </ul>
         )}
 
+        {/* Copyright rewrite toggle */}
+        <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/30 p-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <Label
+                htmlFor="rewrite"
+                className="text-sm font-medium text-foreground"
+              >
+                Rewrite scenarios to avoid copyright
+              </Label>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                AI rewrites each clinical vignette with new patient details,
+                setting and numbers — concept and correct answer stay identical.
+                Pure factual MCQs are kept as-is.
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="rewrite"
+            checked={rewriteScenario}
+            onCheckedChange={setRewriteScenario}
+            disabled={busy}
+          />
+        </div>
+
         {busy && (
           <div className="mt-5 rounded-xl border border-border bg-muted/30 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
