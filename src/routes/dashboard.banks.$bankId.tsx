@@ -310,20 +310,7 @@ function QuestionCard({
         </div>
       </div>
 
-      {q.image_url && (
-        <figure className="mt-4">
-          <img
-            src={q.image_url}
-            alt={q.image_caption ?? "Question diagram"}
-            className="max-h-72 w-full rounded-lg border border-border bg-muted object-contain"
-          />
-          {q.image_caption && (
-            <figcaption className="mt-1 text-xs text-muted-foreground">
-              {q.image_caption}
-            </figcaption>
-          )}
-        </figure>
-      )}
+      {/* Diagram is rendered under the explanation, after reveal (see below) */}
 
       {/* Options */}
       <div
