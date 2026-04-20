@@ -205,6 +205,7 @@ function UploadPage() {
     setFiles([]);
     setTitle("");
     setSubject("");
+    setRewriteScenario(false);
     setStage("idle");
     setResult(null);
   };
