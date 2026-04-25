@@ -426,9 +426,7 @@ function QuestionCard({
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Explanation
               </p>
-              <div className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-foreground">
-                {q.explanation}
-              </div>
+              <RichExplanation text={q.explanation} className="mt-2" />
             </div>
           )}
 
