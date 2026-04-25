@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { downloadFullQuestionBank } from "@/lib/export-questions";
+import {
+  downloadFullQuestionBank,
+  downloadFullQuestionBankCsv,
+} from "@/lib/export-questions";
 import { Button } from "@/components/ui/button";
 import {
   ShieldCheck,
@@ -44,6 +47,7 @@ function AdminPage() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [topBanks, setTopBanks] = useState<BankStat[]>([]);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
 
   // Debug: surface auth state so admins can verify role detection
   useEffect(() => {
@@ -71,6 +75,22 @@ function AdminPage() {
       });
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadCsv = async () => {
+    if (!user) return;
+    setDownloadingCsv(true);
+    try {
+      const { count, fileName } = await downloadFullQuestionBankCsv(user.id);
+      toast.success(`Exported ${count} questions (CSV)`, { description: fileName });
+    } catch (err) {
+      console.error(err);
+      toast.error("CSV export failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDownloadingCsv(false);
     }
   };
 
@@ -184,18 +204,33 @@ function AdminPage() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="w-full gap-2 sm:w-auto"
-        >
-          {downloading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {downloading ? "Preparing…" : "Download Full Question Bank"}
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloading ? "Preparing…" : "Download Excel"}
+          </Button>
+          <Button
+            onClick={handleDownloadCsv}
+            disabled={downloadingCsv}
+            variant="outline"
+            className="w-full gap-2 sm:w-auto"
+          >
+            {downloadingCsv ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloadingCsv ? "Preparing…" : "Download CSV"}
+          </Button>
+        </div>
       </header>
 
       {loading ? (

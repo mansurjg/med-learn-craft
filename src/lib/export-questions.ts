@@ -60,6 +60,8 @@ interface QuestionRow {
   explanation: string | null;
   reference: string | null;
   tags: string[] | null;
+  difficulty: string | null;
+  type: string | null;
   created_at: string;
 }
 
@@ -76,7 +78,7 @@ async function fetchAllQuestions(): Promise<QuestionRow[]> {
     const { data, error } = await supabase
       .from("questions")
       .select(
-        "id,bank_id,stem,options,correct_answers,explanation,reference,tags,created_at"
+        "id,bank_id,stem,options,correct_answers,explanation,reference,tags,difficulty,type,created_at"
       )
       .order("created_at", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
@@ -225,4 +227,164 @@ export async function downloadFullQuestionBank(userId: string): Promise<{
     });
 
   return { count: enriched.length, fileName };
+}
+
+// ---------- CSV EXPORT ----------
+// Strict spec output, one row per question:
+//   type,difficulty,question,option_a,option_b,option_c,option_d,option_e,correct,explanation,reference,tags
+// Quoting rules:
+//   - Always quote: question, option_a..e, correct, explanation
+//   - tags / reference / type / difficulty quoted only when needed
+//   - Empty values stay as ""
+
+const TF_TOKENS = new Set(["true", "false", "t", "f"]);
+
+function csvQuote(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function csvCellMaybe(value: string): string {
+  if (value === "") return '""';
+  if (/[",\n\r]/.test(value)) return csvQuote(value);
+  return value;
+}
+
+interface CleanedRow {
+  type: "SBA" | "TRUE_FALSE";
+  difficulty: "easy" | "medium" | "hard";
+  question: string;
+  options: string[]; // length 5 (empty strings for unused)
+  correct: string;
+  explanation: string;
+  reference: string;
+  tags: string;
+}
+
+function buildCleanedRow(q: QuestionRow): CleanedRow {
+  const opts = normalizeOptions(q.options).slice(0, 5);
+  // Pad to 5
+  const filled: string[] = [0, 1, 2, 3, 4].map((i) => stripHtml(opts[i]?.text ?? ""));
+
+  // Detect TRUE_FALSE
+  const dbType = (q.type ?? "").toString().trim().toUpperCase();
+  const looksTF =
+    opts.length >= 2 &&
+    opts.every((o) => TF_TOKENS.has(stripHtml(o.text).toLowerCase()));
+  const correctHasTF = (q.correct_answers ?? []).some((a) =>
+    /:(true|false|t|f)\b/i.test(String(a))
+  );
+  const type: "SBA" | "TRUE_FALSE" =
+    dbType === "TRUE_FALSE" || looksTF || correctHasTF ? "TRUE_FALSE" : "SBA";
+
+  // Build correct string
+  const validIds = new Set(opts.map((o) => o.id.toLowerCase()));
+  let correct = "";
+  const raw = (q.correct_answers ?? []).map((a) => String(a).trim()).filter(Boolean);
+  if (type === "SBA") {
+    for (const a of raw) {
+      const m = a.toLowerCase().match(/^[a-e]/);
+      if (m && validIds.has(m[0])) {
+        correct = m[0];
+        break;
+      }
+    }
+  } else {
+    const map = new Map<string, "true" | "false">();
+    for (const a of raw) {
+      const m = a.toLowerCase().match(/^([a-e])\s*[:=\-]\s*(true|false|t|f)/);
+      if (m && validIds.has(m[1])) {
+        map.set(m[1], m[2].startsWith("t") ? "true" : "false");
+      }
+    }
+    correct = opts
+      .filter((o) => map.has(o.id.toLowerCase()))
+      .map((o) => `${o.id.toLowerCase()}:${map.get(o.id.toLowerCase())}`)
+      .join(",");
+  }
+
+  // Difficulty
+  const allowedDiff = new Set(["easy", "medium", "hard"]);
+  const dbDiff = (q.difficulty ?? "").toString().trim().toLowerCase();
+  const difficulty = (allowedDiff.has(dbDiff)
+    ? dbDiff
+    : opts.length <= 2
+      ? "easy"
+      : opts.length >= 5
+        ? "hard"
+        : "medium") as "easy" | "medium" | "hard";
+
+  return {
+    type,
+    difficulty,
+    question: stripHtml(q.stem),
+    options: filled,
+    correct,
+    explanation: stripHtml(q.explanation),
+    reference: stripHtml(q.reference),
+    tags: (q.tags ?? []).map((t) => stripHtml(t)).filter(Boolean).join(","),
+  };
+}
+
+function rowToCsv(r: CleanedRow): string {
+  // Always-quoted fields: question, option_a..e, correct, explanation
+  // type / difficulty / reference / tags quoted only when needed
+  return [
+    csvCellMaybe(r.type),
+    csvCellMaybe(r.difficulty),
+    csvQuote(r.question),
+    csvQuote(r.options[0] ?? ""),
+    csvQuote(r.options[1] ?? ""),
+    csvQuote(r.options[2] ?? ""),
+    csvQuote(r.options[3] ?? ""),
+    csvQuote(r.options[4] ?? ""),
+    csvQuote(r.correct),
+    csvQuote(r.explanation),
+    csvCellMaybe(r.reference),
+    csvCellMaybe(r.tags),
+  ].join(",");
+}
+
+export async function downloadFullQuestionBankCsv(userId: string): Promise<{
+  count: number;
+  fileName: string;
+}> {
+  const questions = await fetchAllQuestions();
+
+  const header =
+    "type,difficulty,question,option_a,option_b,option_c,option_d,option_e,correct,explanation,reference,tags";
+  const lines: string[] = [header];
+  for (const q of questions) {
+    lines.push(rowToCsv(buildCleanedRow(q)));
+  }
+  // Footer credit
+  lines.push("");
+  lines.push(csvQuote("AI Engine developed by Dr. Mansur Bin Anowar"));
+
+  // Prepend BOM for Excel UTF-8 compatibility
+  const csv = "\uFEFF" + lines.join("\r\n") + "\r\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const stamp = new Date().toISOString().slice(0, 10);
+  const fileName = `question-bank-${stamp}.csv`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  await supabase
+    .from("download_logs")
+    .insert({
+      user_id: userId,
+      download_type: "full_question_bank_csv",
+      question_count: questions.length,
+      file_name: fileName,
+    })
+    .then((res) => {
+      if (res.error) console.error("Download log failed", res.error);
+    });
+
+  return { count: questions.length, fileName };
 }
