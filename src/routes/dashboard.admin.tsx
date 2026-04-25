@@ -47,6 +47,7 @@ function AdminPage() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [topBanks, setTopBanks] = useState<BankStat[]>([]);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
 
   // Debug: surface auth state so admins can verify role detection
   useEffect(() => {
