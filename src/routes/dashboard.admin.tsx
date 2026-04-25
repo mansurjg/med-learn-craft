@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
-import { downloadFullQuestionBank } from "@/lib/export-questions";
+import {
+  downloadFullQuestionBank,
+  downloadFullQuestionBankCsv,
+} from "@/lib/export-questions";
 import { Button } from "@/components/ui/button";
 import {
   ShieldCheck,
