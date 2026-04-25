@@ -78,7 +78,7 @@ async function fetchAllQuestions(): Promise<QuestionRow[]> {
     const { data, error } = await supabase
       .from("questions")
       .select(
-        "id,bank_id,stem,options,correct_answers,explanation,reference,tags,created_at"
+        "id,bank_id,stem,options,correct_answers,explanation,reference,tags,difficulty,type,created_at"
       )
       .order("created_at", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
