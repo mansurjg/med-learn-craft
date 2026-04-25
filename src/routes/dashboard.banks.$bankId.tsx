@@ -245,18 +245,56 @@ function BankDetail() {
             </div>
           )}
         </div>
-        <Button
-          onClick={startExam}
-          disabled={starting || questions.length === 0}
-          size="lg"
-        >
-          {starting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="mr-2 h-4 w-4" />
-          )}
-          Start timed exam
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={deleting || questions.length === 0}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                {deleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete all
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete all questions?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove all {questions.length} questions
+                  from <strong>{bank.title}</strong>. The bank itself will be
+                  kept. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={deleteAllQuestions}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete all
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button
+            onClick={startExam}
+            disabled={starting || questions.length === 0}
+            size="lg"
+          >
+            {starting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
+            Start timed exam
+          </Button>
+        </div>
       </header>
 
       {questions.length === 0 ? (
