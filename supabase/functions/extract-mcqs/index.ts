@@ -117,7 +117,7 @@ Output via the submit_questions function. Be exhaustive — extract EVERY questi
 
 const REWRITE_ADDENDUM = `
 
-10. COPYRIGHT REWRITE MODE IS ENABLED.
+11. COPYRIGHT REWRITE MODE IS ENABLED.
    For every question, REWRITE the clinical scenario into an entirely original vignette:
    - Preserve concept, learning point, difficulty, and the correct answer(s)
    - Change patient age, gender (if possible), setting, presenting numbers, lab values, ethnicity, vocabulary
