@@ -102,6 +102,24 @@ function BankDetail() {
   const [state, setState] = useState<Record<string, QState>>({});
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteAllQuestions = async () => {
+    if (questions.length === 0) return;
+    setDeleting(true);
+    const { error } = await supabase
+      .from("questions")
+      .delete()
+      .eq("bank_id", bankId);
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setQuestions([]);
+    setState({});
+    toast.success("All questions deleted");
+  };
 
   useEffect(() => {
     let cancelled = false;
