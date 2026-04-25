@@ -95,6 +95,17 @@ Keep total length tight (~120-220 words). No fluff. No diagram description.
 
 9. NEVER guess answers when there is no marker. Leave correct_answers empty.
 
+10. QUESTION CLEANING & RECREATION (STRICT — apply to EVERY question):
+   - TYPE: only "SBA" or "TRUE_FALSE". Detect and fix if missing/wrong. SBA = single best answer with 2–5 distinct options. TRUE_FALSE = a stem followed by independent statements each judged true or false.
+   - QUESTION TEXT: fix grammar/spelling, make it clear, short, and exam-oriented. DO NOT change medical meaning. Output the cleaned, recreated form directly in "stem" (short, simple, straightforward, medically accurate, same correct answer).
+   - OPTIONS: clean each option text, remove duplicates, keep up to 5 options with ids "a","b","c","d","e" in order. Omit unused option slots entirely (do NOT emit empty option objects).
+   - DIFFICULTY: ignore any input difficulty. Auto-assign one of: easy | medium | hard based on cognitive load.
+   - CORRECT ANSWER FORMAT (STRICT):
+       • SBA  → correct_answers MUST be exactly one element, a single lowercase letter: ["a"] | ["b"] | ["c"] | ["d"] | ["e"].
+       • TRUE_FALSE → correct_answers MUST list every existing option as "<id>:true" or "<id>:false", e.g. ["a:true","b:false","c:true"]. Only include ids that exist.
+   - EXPLANATION: keep the structured format from rule 6, but stay tight and ensure factual correctness.
+   - Output cleaned data via submit_questions — do NOT return a separate "recreated_question" field; the recreated form IS the stem.
+
 Output via the submit_questions function. Be exhaustive — extract EVERY question visible.`;
 
 const REWRITE_ADDENDUM = `
@@ -453,51 +464,107 @@ Deno.serve(async (req) => {
     let flagged = 0;
 
     const rows = questions.map((q, i) => {
-      const opts = Array.isArray(q.options) ? q.options : [];
-      const isTF =
-        opts.length === 2 &&
+      // ---- Clean & normalise options ----
+      const rawOpts = Array.isArray(q.options) ? q.options : [];
+      const seen = new Set<string>();
+      const cleanedOpts: { id: string; text: string }[] = [];
+      const letters = ["a", "b", "c", "d", "e"];
+      let letterIdx = 0;
+      for (const o of rawOpts) {
+        const text = String(o?.text ?? "").replace(/\s+/g, " ").trim();
+        if (!text) continue;
+        const key = text.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const id = (String(o?.id ?? "").trim().toLowerCase().match(/^[a-e]$/)?.[0])
+          ?? letters[letterIdx];
+        cleanedOpts.push({ id, text });
+        letterIdx++;
+        if (cleanedOpts.length >= 5) break;
+      }
+      // Reassign ids sequentially a..e to guarantee canonical order
+      const opts = cleanedOpts.map((o, idx) => ({ id: letters[idx], text: o.text }));
+      const validIds = new Set(opts.map((o) => o.id));
+
+      // ---- Detect type ----
+      const looksTF =
+        opts.length >= 2 &&
         opts.every((o) =>
-          ["true", "false"].includes(String(o.text ?? "").trim().toLowerCase())
+          ["true", "false", "t", "f"].includes(o.text.trim().toLowerCase())
         );
+      const tfMarkerHints = (q.correct_answers ?? []).some((a) =>
+        /:(true|false|t|f)\b/i.test(String(a))
+      );
+      const type: "SBA" | "TRUE_FALSE" = looksTF || tfMarkerHints ? "TRUE_FALSE" : "SBA";
+
+      // ---- Normalise correct answers to strict format ----
+      const rawCorrect = (q.correct_answers ?? []).map((a) => String(a).trim()).filter(Boolean);
+      let correctAnswers: string[] = [];
+      if (type === "SBA") {
+        // Pick the first valid single letter
+        for (const a of rawCorrect) {
+          const m = a.toLowerCase().match(/^[a-e]/);
+          if (m && validIds.has(m[0])) {
+            correctAnswers = [m[0]];
+            break;
+          }
+        }
+      } else {
+        // TRUE_FALSE: build "<id>:true|false" for every existing option
+        const map = new Map<string, "true" | "false">();
+        for (const a of rawCorrect) {
+          const m = a.toLowerCase().match(/^([a-e])\s*[:=\-]\s*(true|false|t|f)/);
+          if (m && validIds.has(m[1])) {
+            map.set(m[1], m[2].startsWith("t") ? "true" : "false");
+          }
+        }
+        correctAnswers = opts
+          .filter((o) => map.has(o.id))
+          .map((o) => `${o.id}:${map.get(o.id)}`);
+      }
 
       const conf =
         typeof q.confidence_score === "number"
           ? Math.max(0, Math.min(1, q.confidence_score))
-          : (q.correct_answers?.length ?? 0) > 0
+          : correctAnswers.length > 0
             ? 0.7
             : 0;
-      const noAnswer = !q.correct_answers || q.correct_answers.length === 0;
-      // Flag if low confidence OR no answer OR an image was needed but not found
+      const noAnswer = correctAnswers.length === 0;
       const img = (q as unknown as { _image?: WikimediaImage })._image;
       const needsManualImage = Boolean(q.needs_image && !img);
       const needsReview = conf < CONFIDENCE_THRESHOLD || noAnswer || needsManualImage;
       if (needsReview) flagged++;
 
-      // Caption embeds source + license so we don't need a schema migration
       const caption = img
         ? `${img.title || q.image_query} — Source: Wikimedia Commons (${img.license}) · ${img.descriptionUrl}`
         : null;
 
-      // Reference: join AI-supplied references with newlines
       const referenceText =
         q.references && q.references.length > 0
           ? q.references.filter(Boolean).join("\n")
           : null;
 
-      // Tags: mark questions that need a manual image so admins can find them
       const tags: string[] = [];
       if (needsManualImage) tags.push("needs-image");
       if (rewriteScenario) tags.push("rewritten");
 
+      // Auto-assign difficulty if missing
+      const allowedDiff = new Set(["easy", "medium", "hard"]);
+      const difficulty = q.difficulty && allowedDiff.has(q.difficulty)
+        ? q.difficulty
+        : (opts.length <= 2 ? "easy" : opts.length >= 5 ? "hard" : "medium");
+
+      const cleanStem = String(q.stem ?? "").replace(/\s+/g, " ").trim();
+
       return {
         bank_id: bank.id,
         position: i + 1,
-        stem: q.stem,
-        type: isTF ? "TRUE_FALSE" : "SBA",
-        options: q.options,
-        correct_answers: q.correct_answers ?? [],
+        stem: cleanStem,
+        type,
+        options: opts,
+        correct_answers: correctAnswers,
         explanation: q.explanation ?? null,
-        difficulty: q.difficulty ?? null,
+        difficulty,
         reference: referenceText,
         image_url: img?.url ?? null,
         image_caption: caption,
