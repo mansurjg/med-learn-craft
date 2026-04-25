@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { RichExplanation } from "@/components/RichExplanation";
 import {
   Loader2,
   CheckCircle2,
@@ -219,11 +218,11 @@ function ReviewPage() {
                 </ul>
 
                 {q.explanation && (
-                  <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-                    <p className="mb-1 text-xs font-semibold text-primary">
+                  <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-foreground">
+                    <p className="mb-1 font-semibold text-primary">
                       Explanation
                     </p>
-                    <RichExplanation text={q.explanation} />
+                    {q.explanation}
                   </div>
                 )}
               </div>

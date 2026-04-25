@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { RichExplanation } from "@/components/RichExplanation";
 import {
   ArrowLeft,
   Play,
@@ -427,7 +426,9 @@ function QuestionCard({
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Explanation
               </p>
-              <RichExplanation text={q.explanation} className="mt-2" />
+              <div className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-foreground">
+                {q.explanation}
+              </div>
             </div>
           )}
 
