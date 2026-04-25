@@ -4,6 +4,17 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft,
   Play,
   Loader2,
@@ -13,6 +24,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -90,6 +102,24 @@ function BankDetail() {
   const [state, setState] = useState<Record<string, QState>>({});
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteAllQuestions = async () => {
+    if (questions.length === 0) return;
+    setDeleting(true);
+    const { error } = await supabase
+      .from("questions")
+      .delete()
+      .eq("bank_id", bankId);
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setQuestions([]);
+    setState({});
+    toast.success("All questions deleted");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -215,18 +245,56 @@ function BankDetail() {
             </div>
           )}
         </div>
-        <Button
-          onClick={startExam}
-          disabled={starting || questions.length === 0}
-          size="lg"
-        >
-          {starting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="mr-2 h-4 w-4" />
-          )}
-          Start timed exam
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={deleting || questions.length === 0}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                {deleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete all
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete all questions?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove all {questions.length} questions
+                  from <strong>{bank.title}</strong>. The bank itself will be
+                  kept. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={deleteAllQuestions}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete all
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <Button
+            onClick={startExam}
+            disabled={starting || questions.length === 0}
+            size="lg"
+          >
+            {starting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
+            Start timed exam
+          </Button>
+        </div>
       </header>
 
       {questions.length === 0 ? (
