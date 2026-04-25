@@ -204,18 +204,33 @@ function AdminPage() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="w-full gap-2 sm:w-auto"
-        >
-          {downloading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {downloading ? "Preparing…" : "Download Full Question Bank"}
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="w-full gap-2 sm:w-auto"
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloading ? "Preparing…" : "Download Excel"}
+          </Button>
+          <Button
+            onClick={handleDownloadCsv}
+            disabled={downloadingCsv}
+            variant="outline"
+            className="w-full gap-2 sm:w-auto"
+          >
+            {downloadingCsv ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {downloadingCsv ? "Preparing…" : "Download CSV"}
+          </Button>
+        </div>
       </header>
 
       {loading ? (
