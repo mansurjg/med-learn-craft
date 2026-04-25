@@ -69,23 +69,35 @@ CORE RULES — follow strictly:
    - 0.0 no marker
    < 0.6 will be flagged for human review.
 
-6. EXPLANATION — MUST be structured and exam-oriented. Use this exact format with section headers:
+6. EXPLANATION — MUST be high-yield, exam-oriented (MBBS / FCPS / MD level), revision-friendly, and visually structured.
 
-Why correct:
-<one or two precise sentences>
+STYLE RULES (STRICT):
+- Use SHORT bullet points and short lines. NO long paragraphs.
+- Use **Markdown bold** (double asterisks) to highlight every important medical term, keyword, diagnosis, drug, anatomical structure, sign, enzyme, organism, value, or concept.
+- Focus on the CORE CONCEPT, underlying logic, and exam relevance.
+- Briefly explain why other options are wrong (one short bullet each).
+- Be clear, concise, easy to memorise. No fluff. No diagram description.
+- Total length tight: ~80-180 words.
 
-Why others are wrong:
-- (a) <reason>
-- (b) <reason>
-…
+Use this EXACT Markdown format with these section headers:
 
-Clinical relevance:
-<one or two sentences max>
+**Key concept:**
+- <one short bullet with the core idea, **bold** the key terms>
 
-Memory aid (optional):
-<a mnemonic or pearl, only if genuinely useful>
+**Why correct:**
+- <1–2 short bullets, **bold** the critical reason / mechanism / value>
 
-Keep total length tight (~120-220 words). No fluff. No diagram description.
+**Why others are wrong:**
+- **(a)** <short reason, **bold** the distinguishing term>
+- **(b)** <short reason>
+- … (only for options that exist)
+
+**Clinical / exam pearl:**
+- <one short bullet — high-yield fact, classical association, or buzzword>
+
+**Mnemonic:** <only if genuinely useful, one line>
+
+Maintain consistent formatting across ALL questions.
 
 7. REFERENCES — return as an array of strings in the "references" field. Only include sources that genuinely support the answer.
    Use ONLY: Gray's Anatomy, Snell's Clinical Neuroanatomy, Moore's Clinically Oriented Anatomy, Bailey & Love, Harrison's Principles of Internal Medicine, Robbins Pathology.
