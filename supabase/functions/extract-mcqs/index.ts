@@ -95,6 +95,17 @@ Keep total length tight (~120-220 words). No fluff. No diagram description.
 
 9. NEVER guess answers when there is no marker. Leave correct_answers empty.
 
+10. QUESTION CLEANING & RECREATION (STRICT — apply to EVERY question):
+   - TYPE: only "SBA" or "TRUE_FALSE". Detect and fix if missing/wrong. SBA = single best answer with 2–5 distinct options. TRUE_FALSE = a stem followed by independent statements each judged true or false.
+   - QUESTION TEXT: fix grammar/spelling, make it clear, short, and exam-oriented. DO NOT change medical meaning. Output the cleaned, recreated form directly in "stem" (short, simple, straightforward, medically accurate, same correct answer).
+   - OPTIONS: clean each option text, remove duplicates, keep up to 5 options with ids "a","b","c","d","e" in order. Omit unused option slots entirely (do NOT emit empty option objects).
+   - DIFFICULTY: ignore any input difficulty. Auto-assign one of: easy | medium | hard based on cognitive load.
+   - CORRECT ANSWER FORMAT (STRICT):
+       • SBA  → correct_answers MUST be exactly one element, a single lowercase letter: ["a"] | ["b"] | ["c"] | ["d"] | ["e"].
+       • TRUE_FALSE → correct_answers MUST list every existing option as "<id>:true" or "<id>:false", e.g. ["a:true","b:false","c:true"]. Only include ids that exist.
+   - EXPLANATION: keep the structured format from rule 6, but stay tight and ensure factual correctness.
+   - Output cleaned data via submit_questions — do NOT return a separate "recreated_question" field; the recreated form IS the stem.
+
 Output via the submit_questions function. Be exhaustive — extract EVERY question visible.`;
 
 const REWRITE_ADDENDUM = `
