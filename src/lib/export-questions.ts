@@ -60,6 +60,8 @@ interface QuestionRow {
   explanation: string | null;
   reference: string | null;
   tags: string[] | null;
+  difficulty: string | null;
+  type: string | null;
   created_at: string;
 }
 
