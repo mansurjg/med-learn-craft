@@ -78,6 +78,22 @@ function AdminPage() {
     }
   };
 
+  const handleDownloadCsv = async () => {
+    if (!user) return;
+    setDownloadingCsv(true);
+    try {
+      const { count, fileName } = await downloadFullQuestionBankCsv(user.id);
+      toast.success(`Exported ${count} questions (CSV)`, { description: fileName });
+    } catch (err) {
+      console.error(err);
+      toast.error("CSV export failed", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDownloadingCsv(false);
+    }
+  };
+
   useEffect(() => {
     if (!isStaff) return;
     let cancelled = false;
