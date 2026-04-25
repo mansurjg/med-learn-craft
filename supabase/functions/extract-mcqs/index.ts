@@ -93,7 +93,14 @@ Keep total length tight (~120-220 words). No fluff. No diagram description.
 
 8. DIAGRAM — ALWAYS provide image_query for EVERY question (regardless of subject). Set needs_image=true for every question and produce a precise English Wikimedia-style search term that best illustrates the concept (e.g. "cranial nerve foramina labeled", "ECG anterior STEMI", "nephron diagram labeled", "Streptococcus pneumoniae gram stain", "femoral triangle anatomy"). Prefer anatomy / histology / radiology / pathology / micrograph / ECG / labeled diagram terms. Do NOT describe the diagram in the explanation.
 
-9. NEVER guess answers when there is no marker. Leave correct_answers empty.
+9. ANSWER VALIDATION (STRICT — apply to EVERY question):
+   - First, detect any marker as described in rule 4.
+   - Then INDEPENDENTLY reason out the medically/scientifically correct answer yourself.
+   - If a marker exists AND matches your reasoning → keep it, set confidence_score ≥ 0.9.
+   - If a marker exists but is medically WRONG → override it with the correct answer, set marker_type accordingly, and set confidence_score = 0.7 (so it is flagged for human review). Note the override briefly inside the explanation's "Why correct" section.
+   - If NO marker is present → still provide the correct answer based on your medical knowledge. Do NOT leave correct_answers empty when the question has a clear, well-established correct answer. Set confidence_score = 0.7 and marker_type = "none".
+   - Only leave correct_answers = [] when the question is genuinely ambiguous, malformed, or beyond reliable determination. In that case set needs_review via low confidence (< 0.6).
+   - Base every decision on medical/scientific correctness — never guess randomly.
 
 10. QUESTION CLEANING & RECREATION (STRICT — apply to EVERY question):
    - TYPE: only "SBA" or "TRUE_FALSE". Detect and fix if missing/wrong. SBA = single best answer with 2–5 distinct options. TRUE_FALSE = a stem followed by independent statements each judged true or false.
@@ -110,7 +117,7 @@ Output via the submit_questions function. Be exhaustive — extract EVERY questi
 
 const REWRITE_ADDENDUM = `
 
-10. COPYRIGHT REWRITE MODE IS ENABLED.
+11. COPYRIGHT REWRITE MODE IS ENABLED.
    For every question, REWRITE the clinical scenario into an entirely original vignette:
    - Preserve concept, learning point, difficulty, and the correct answer(s)
    - Change patient age, gender (if possible), setting, presenting numbers, lab values, ethnicity, vocabulary
