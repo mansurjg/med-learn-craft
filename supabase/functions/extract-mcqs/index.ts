@@ -623,7 +623,7 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("extract-mcqs error:", msg);
+    console.error("extract-mcqs error:", msg, e instanceof Error ? e.stack : "");
 
     if (uploadLogId) {
       await fetch(`${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`, {
@@ -636,19 +636,68 @@ Deno.serve(async (req) => {
       }).catch(() => {});
     }
 
-    let status = 500;
-    let userMessage = msg;
-    if (msg === "RATE_LIMIT") {
-      status = 429;
-      userMessage = "Rate limit reached. Please try again in a minute.";
-    } else if (msg === "PAYMENT_REQUIRED") {
-      status = 402;
-      userMessage =
-        "Lovable AI credits exhausted. Add credits in Settings → Workspace → Usage.";
-    }
-    return new Response(JSON.stringify({ error: userMessage }), {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Map internal codes -> user-friendly messages.
+    // IMPORTANT: return HTTP 200 with structured error fields. supabase.functions.invoke
+    // hides response bodies on non-2xx, which produces the dreaded
+    // "Edge Function returned a non-2xx status code" with no detail. Returning 200
+    // keeps the body accessible and lets the frontend show clear messages.
+    const errorMap: Record<string, { code: string; message: string }> = {
+      XAI_API_KEY_MISSING: {
+        code: "XAI_API_KEY_MISSING",
+        message: "AI service is not configured. The XAI_API_KEY secret is missing.",
+      },
+      XAI_UNAUTHORIZED: {
+        code: "XAI_UNAUTHORIZED",
+        message: "xAI API key is invalid or has been revoked. Please update the XAI_API_KEY secret.",
+      },
+      XAI_BAD_REQUEST: {
+        code: "XAI_BAD_REQUEST",
+        message: "xAI rejected the request. The file may be too large or in an unsupported format.",
+      },
+      XAI_NOT_FOUND: {
+        code: "XAI_NOT_FOUND",
+        message: "xAI model endpoint not found. The configured model may be unavailable.",
+      },
+      XAI_SERVICE_UNAVAILABLE: {
+        code: "XAI_SERVICE_UNAVAILABLE",
+        message: "xAI service is temporarily unavailable. Please try again in a moment.",
+      },
+      XAI_NETWORK_ERROR: {
+        code: "XAI_NETWORK_ERROR",
+        message: "Could not reach xAI. Check your network and retry.",
+      },
+      XAI_EMPTY_RESPONSE: {
+        code: "XAI_EMPTY_RESPONSE",
+        message: "xAI returned an empty response. Please try again.",
+      },
+      XAI_INVALID_JSON: {
+        code: "XAI_INVALID_JSON",
+        message: "xAI returned malformed output. Please try again or simplify your input.",
+      },
+      XAI_INVALID_SCHEMA: {
+        code: "XAI_INVALID_SCHEMA",
+        message: "xAI response did not match the expected schema. Please try again.",
+      },
+      RATE_LIMIT: {
+        code: "RATE_LIMIT",
+        message: "xAI rate limit hit. Please wait a minute and try again.",
+      },
+      PAYMENT_REQUIRED: {
+        code: "PAYMENT_REQUIRED",
+        message: "xAI credits exhausted. Please top up your xAI account billing.",
+      },
+    };
+    const mapped = errorMap[msg] ?? {
+      code: "INTERNAL_ERROR",
+      message: msg.length > 0 && msg.length < 200 ? msg : "Extraction failed. Please try again.",
+    };
+
+    return new Response(
+      JSON.stringify({ ok: false, error: mapped.code, message: mapped.message }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });
