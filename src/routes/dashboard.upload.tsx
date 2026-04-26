@@ -146,7 +146,9 @@ function UploadPage() {
 
   const submit = async () => {
     if (!title.trim()) return toast.error("Please enter a bank title");
-    if (files.length === 0) return toast.error("Please add at least one file");
+    const trimmedText = pastedText.trim();
+    if (files.length === 0 && !trimmedText)
+      return toast.error("Add at least one file or paste MCQ text");
 
     setResult(null);
     setStage("reading");
@@ -170,6 +172,7 @@ function UploadPage() {
       const requestPromise = supabase.functions.invoke("extract-mcqs", {
         body: {
           files: payloadFiles,
+          text: trimmedText || undefined,
           bankTitle: title.trim(),
           subject: subject.trim() || null,
           rewriteScenario,
