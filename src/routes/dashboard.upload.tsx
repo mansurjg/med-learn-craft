@@ -191,6 +191,14 @@ function UploadPage() {
       const { data, error } = await requestPromise;
       if (error) throw error;
 
+      // Edge function now returns 200 with { ok, error, message } shape so
+      // we can show clear messages instead of "non-2xx status code".
+      if (!data || data.ok === false) {
+        const code = data?.error ?? "UNKNOWN";
+        const message = data?.message ?? "Extraction failed. Please try again.";
+        throw new Error(`${code}::${message}`);
+      }
+
       setStage("done");
       setResult({
         bankId: data.bankId,
@@ -202,11 +210,17 @@ function UploadPage() {
       setStage("error");
       const raw = e instanceof Error ? e.message : "Upload failed";
       let msg = raw;
-      if (/PAYMENT_REQUIRED|402/i.test(raw)) {
-        msg = "AI credits exhausted. Add credits in Settings → Workspace → Usage to continue extracting.";
+      // Structured error from edge function: "CODE::message"
+      if (raw.includes("::")) {
+        msg = raw.split("::").slice(1).join("::");
+      } else if (/PAYMENT_REQUIRED|402/i.test(raw)) {
+        msg = "xAI credits exhausted. Please top up your xAI account billing.";
       } else if (/RATE_LIMIT|429/i.test(raw)) {
         msg = "AI rate limit hit. Please wait a minute and try again.";
+      } else if (/non-2xx/i.test(raw)) {
+        msg = "The extraction service is unreachable. Please try again in a moment.";
       }
+      console.error("Upload error:", raw);
       toast.error(msg, { duration: 8000 });
     }
   };

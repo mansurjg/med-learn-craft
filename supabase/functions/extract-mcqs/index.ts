@@ -126,138 +126,126 @@ const REWRITE_ADDENDUM = `
    - Keep stem length similar to source. No filler.
    This rule does NOT apply to pure factual MCQs without a clinical vignette — clean OCR only for those.`;
 
-async function extractWithGemini(
+async function extractWithGrok(
   files: { mimeType: string; data: string }[],
   rewriteScenario: boolean,
   pastedText?: string | null
 ): Promise<ExtractedQuestion[]> {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  const apiKey = Deno.env.get("XAI_API_KEY");
+  if (!apiKey) throw new Error("XAI_API_KEY_MISSING");
 
   const systemPrompt = rewriteScenario
     ? SYSTEM_PROMPT_BASE + REWRITE_ADDENDUM
     : SYSTEM_PROMPT_BASE;
 
-  const content: Array<Record<string, unknown>> = [
-    {
-      type: "text",
-      text: rewriteScenario
-        ? "Extract every MCQ. Rewrite each clinical scenario originally per rule 10. Preserve concept and correct answer."
-        : "Extract every MCQ from these documents. Detect answer markers carefully.",
-    },
-  ];
+  // xAI Grok: vision model accepts images. Use grok-2-vision-latest when files
+  // are present, fall back to grok-2-latest for text-only requests.
+  const hasImages = files.length > 0;
+  const model = hasImages ? "grok-2-vision-latest" : "grok-2-latest";
+
+  const content: Array<Record<string, unknown>> = [];
+  const userInstruction = rewriteScenario
+    ? "Extract every MCQ. Rewrite each clinical scenario originally per rule 11. Preserve concept and correct answer."
+    : "Extract every MCQ from these documents. Detect answer markers carefully. Return ONLY a strict JSON object matching the schema.";
+  content.push({ type: "text", text: userInstruction });
   if (pastedText && pastedText.trim()) {
+    // Truncate very long pasted text to keep token usage low
+    const truncated = pastedText.trim().slice(0, 60000);
     content.push({
       type: "text",
-      text: `--- PASTED MCQ TEXT (treat as authoritative source, extract every question) ---\n\n${pastedText.trim()}`,
+      text: `--- PASTED MCQ TEXT (authoritative source, extract every question) ---\n\n${truncated}`,
     });
   }
   for (const f of files) {
     const url = `data:${f.mimeType};base64,${f.data}`;
-    content.push({ type: "image_url", image_url: { url } });
+    content.push({ type: "image_url", image_url: { url, detail: "high" } });
   }
 
+  // Strong JSON-mode instruction appended to system prompt
+  const jsonInstruction = `\n\nOUTPUT FORMAT — return a single JSON object EXACTLY in this shape (no prose, no markdown fences):
+{
+  "questions": [
+    {
+      "stem": "string",
+      "options": [{"id":"a","text":"..."}, ...],
+      "correct_answers": ["a"]  // SBA: one letter; TRUE_FALSE: ["a:true","b:false",...]
+      ,
+      "explanation": "string (use the structured format)",
+      "difficulty": "easy|medium|hard",
+      "references": ["string", ...],
+      "page_number": 1,
+      "marker_type": "tick|star|bold|underline|highlight|circle|text|none|unknown",
+      "confidence_score": 0.9,
+      "needs_image": true,
+      "image_query": "string"
+    }
+  ]
+}`;
+
   const body = {
-    model: "google/gemini-3-flash-preview",
+    model,
     messages: [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: systemPrompt + jsonInstruction },
       { role: "user", content },
     ],
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: "submit_questions",
-          description: "Return all extracted MCQs with marker detection, structured explanations, and references.",
-          parameters: {
-            type: "object",
-            properties: {
-              questions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    stem: { type: "string" },
-                    options: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          id: { type: "string" },
-                          text: { type: "string" },
-                        },
-                        required: ["id", "text"],
-                      },
-                    },
-                    correct_answers: {
-                      type: "array",
-                      items: { type: "string" },
-                    },
-                    explanation: { type: "string" },
-                    difficulty: {
-                      type: "string",
-                      enum: ["easy", "medium", "hard"],
-                    },
-                    references: {
-                      type: "array",
-                      items: { type: "string" },
-                      description: "Textbook references like \"Gray's Anatomy — Cranial Nerves\".",
-                    },
-                    page_number: { type: "integer" },
-                    marker_type: {
-                      type: "string",
-                      enum: [
-                        "tick",
-                        "star",
-                        "bold",
-                        "underline",
-                        "highlight",
-                        "circle",
-                        "text",
-                        "none",
-                        "unknown",
-                      ],
-                    },
-                    confidence_score: { type: "number" },
-                    needs_image: { type: "boolean" },
-                    image_query: { type: "string" },
-                  },
-                  required: ["stem", "options", "correct_answers"],
-                },
-              },
-            },
-            required: ["questions"],
-          },
-        },
-      },
-    ],
-    tool_choice: { type: "function", function: { name: "submit_questions" } },
+    temperature: 0,
+    response_format: { type: "json_object" },
   };
 
-  const resp = await fetch(
-    "https://ai.gateway.lovable.dev/v1/chat/completions",
-    {
+  let resp: Response;
+  try {
+    resp = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
-    }
-  );
+    });
+  } catch (netErr) {
+    console.error("xAI network error:", netErr);
+    throw new Error("XAI_NETWORK_ERROR");
+  }
 
   if (!resp.ok) {
-    const txt = await resp.text();
+    const txt = await resp.text().catch(() => "");
+    console.error(`xAI API error ${resp.status}:`, txt.slice(0, 1000));
+    if (resp.status === 401 || resp.status === 403) throw new Error("XAI_UNAUTHORIZED");
     if (resp.status === 429) throw new Error("RATE_LIMIT");
     if (resp.status === 402) throw new Error("PAYMENT_REQUIRED");
-    throw new Error(`AI gateway: ${resp.status} ${txt}`);
+    if (resp.status === 400) throw new Error("XAI_BAD_REQUEST");
+    if (resp.status === 404) throw new Error("XAI_NOT_FOUND");
+    if (resp.status >= 500) throw new Error("XAI_SERVICE_UNAVAILABLE");
+    throw new Error(`XAI_REQUEST_FAILED_${resp.status}`);
   }
 
   const data = await resp.json();
-  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-  if (!toolCall) throw new Error("No tool call returned by model");
-  const args = JSON.parse(toolCall.function.arguments);
-  return args.questions as ExtractedQuestion[];
+  const raw = data.choices?.[0]?.message?.content;
+  if (!raw || typeof raw !== "string") {
+    console.error("xAI: no content in response", JSON.stringify(data).slice(0, 500));
+    throw new Error("XAI_EMPTY_RESPONSE");
+  }
+
+  // Strip accidental markdown fences then parse
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  let parsed: { questions?: ExtractedQuestion[] };
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (parseErr) {
+    console.error("xAI: failed to parse JSON:", cleaned.slice(0, 500));
+    throw new Error("XAI_INVALID_JSON");
+  }
+
+  if (!parsed.questions || !Array.isArray(parsed.questions)) {
+    console.error("xAI: missing 'questions' array");
+    throw new Error("XAI_INVALID_SCHEMA");
+  }
+  return parsed.questions;
 }
 
 interface WikimediaImage {
@@ -356,29 +344,38 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: false, error: "MISSING_AUTH", message: "You must be signed in to upload." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: serviceKey, Authorization: authHeader },
     });
     if (!userResp.ok) {
-      return new Response(JSON.stringify({ error: "Invalid auth" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: false, error: "INVALID_AUTH", message: "Your session has expired. Please sign in again." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     const userData = await userResp.json();
     userId = userData.id as string;
 
-    const payload = await req.json();
+    let payload: Record<string, unknown>;
+    try {
+      payload = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ ok: false, error: "INVALID_JSON", message: "Invalid request body." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     let files: { name: string; mimeType: string; data: string }[] = [];
     if (Array.isArray(payload.files)) {
-      files = payload.files;
+      files = payload.files as { name: string; mimeType: string; data: string }[];
     } else if (Array.isArray(payload.images)) {
-      files = payload.images.map((url: string, i: number) => {
+      files = (payload.images as string[]).map((url: string, i: number) => {
         const m = url.match(/^data:([^;]+);base64,(.+)$/);
         return {
           name: `image-${i + 1}`,
@@ -391,26 +388,20 @@ Deno.serve(async (req) => {
     const subject = (payload.subject as string | undefined) ?? null;
     const rewriteScenario = Boolean(payload.rewriteScenario);
     const pastedText =
-      typeof payload.text === "string" && payload.text.trim()
+      typeof payload.text === "string" && (payload.text as string).trim()
         ? (payload.text as string)
         : null;
 
     if ((files.length === 0 && !pastedText) || !bankTitle) {
       return new Response(
-        JSON.stringify({ error: "Missing files/text or bankTitle" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ ok: false, error: "MISSING_INPUT", message: "Please add at least one file or paste MCQ text, and provide a bank title." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     if (files.length > 20) {
       return new Response(
-        JSON.stringify({ error: "Maximum 20 files per upload" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ ok: false, error: "TOO_MANY_FILES", message: "Maximum 20 files per upload." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -440,7 +431,7 @@ Deno.serve(async (req) => {
       `extract-mcqs: ${files.length} file(s) + ${pastedText ? "text" : "no text"} for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
     );
 
-    const questions = await extractWithGemini(files, rewriteScenario, pastedText);
+    const questions = await extractWithGrok(files, rewriteScenario, pastedText);
     console.log(`extract-mcqs: got ${questions.length} questions`);
 
     if (uploadLogId) {
@@ -623,6 +614,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        ok: true,
         bankId: bank.id,
         count: rows.length,
         flagged,
@@ -635,7 +627,7 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("extract-mcqs error:", msg);
+    console.error("extract-mcqs error:", msg, e instanceof Error ? e.stack : "");
 
     if (uploadLogId) {
       await fetch(`${supabaseUrl}/rest/v1/upload_logs?id=eq.${uploadLogId}`, {
@@ -648,19 +640,68 @@ Deno.serve(async (req) => {
       }).catch(() => {});
     }
 
-    let status = 500;
-    let userMessage = msg;
-    if (msg === "RATE_LIMIT") {
-      status = 429;
-      userMessage = "Rate limit reached. Please try again in a minute.";
-    } else if (msg === "PAYMENT_REQUIRED") {
-      status = 402;
-      userMessage =
-        "Lovable AI credits exhausted. Add credits in Settings → Workspace → Usage.";
-    }
-    return new Response(JSON.stringify({ error: userMessage }), {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Map internal codes -> user-friendly messages.
+    // IMPORTANT: return HTTP 200 with structured error fields. supabase.functions.invoke
+    // hides response bodies on non-2xx, which produces the dreaded
+    // "Edge Function returned a non-2xx status code" with no detail. Returning 200
+    // keeps the body accessible and lets the frontend show clear messages.
+    const errorMap: Record<string, { code: string; message: string }> = {
+      XAI_API_KEY_MISSING: {
+        code: "XAI_API_KEY_MISSING",
+        message: "AI service is not configured. The XAI_API_KEY secret is missing.",
+      },
+      XAI_UNAUTHORIZED: {
+        code: "XAI_UNAUTHORIZED",
+        message: "xAI API key is invalid or has been revoked. Please update the XAI_API_KEY secret.",
+      },
+      XAI_BAD_REQUEST: {
+        code: "XAI_BAD_REQUEST",
+        message: "xAI rejected the request. The file may be too large or in an unsupported format.",
+      },
+      XAI_NOT_FOUND: {
+        code: "XAI_NOT_FOUND",
+        message: "xAI model endpoint not found. The configured model may be unavailable.",
+      },
+      XAI_SERVICE_UNAVAILABLE: {
+        code: "XAI_SERVICE_UNAVAILABLE",
+        message: "xAI service is temporarily unavailable. Please try again in a moment.",
+      },
+      XAI_NETWORK_ERROR: {
+        code: "XAI_NETWORK_ERROR",
+        message: "Could not reach xAI. Check your network and retry.",
+      },
+      XAI_EMPTY_RESPONSE: {
+        code: "XAI_EMPTY_RESPONSE",
+        message: "xAI returned an empty response. Please try again.",
+      },
+      XAI_INVALID_JSON: {
+        code: "XAI_INVALID_JSON",
+        message: "xAI returned malformed output. Please try again or simplify your input.",
+      },
+      XAI_INVALID_SCHEMA: {
+        code: "XAI_INVALID_SCHEMA",
+        message: "xAI response did not match the expected schema. Please try again.",
+      },
+      RATE_LIMIT: {
+        code: "RATE_LIMIT",
+        message: "xAI rate limit hit. Please wait a minute and try again.",
+      },
+      PAYMENT_REQUIRED: {
+        code: "PAYMENT_REQUIRED",
+        message: "xAI credits exhausted. Please top up your xAI account billing.",
+      },
+    };
+    const mapped = errorMap[msg] ?? {
+      code: "INTERNAL_ERROR",
+      message: msg.length > 0 && msg.length < 200 ? msg : "Extraction failed. Please try again.",
+    };
+
+    return new Response(
+      JSON.stringify({ ok: false, error: mapped.code, message: mapped.message }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });
