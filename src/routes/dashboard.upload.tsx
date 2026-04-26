@@ -208,6 +208,7 @@ function UploadPage() {
   const reset = () => {
     files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
     setFiles([]);
+    setPastedText("");
     setTitle("");
     setSubject("");
     setRewriteScenario(false);
