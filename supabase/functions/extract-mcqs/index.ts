@@ -414,8 +414,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const fileNames = files.map((f) => f.name).join(", ").slice(0, 500);
-    const fileTypes = Array.from(new Set(files.map((f) => f.mimeType))).join(", ");
+    const namesArr = files.map((f) => f.name);
+    if (pastedText) namesArr.push("pasted-text.txt");
+    const fileNames = namesArr.join(", ").slice(0, 500);
+    const typesArr = Array.from(new Set(files.map((f) => f.mimeType)));
+    if (pastedText) typesArr.push("text/plain");
+    const fileTypes = typesArr.join(", ") || "text/plain";
     const logResp = await fetch(`${supabaseUrl}/rest/v1/upload_logs`, {
       method: "POST",
       headers: adminHeaders,
@@ -423,7 +427,7 @@ Deno.serve(async (req) => {
         uploader_id: userId,
         file_name: fileNames,
         file_type: fileTypes,
-        page_count: files.length,
+        page_count: files.length + (pastedText ? 1 : 0),
         processing_status: "extracting",
       }),
     });
@@ -433,10 +437,10 @@ Deno.serve(async (req) => {
     }
 
     console.log(
-      `extract-mcqs: ${files.length} file(s) for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
+      `extract-mcqs: ${files.length} file(s) + ${pastedText ? "text" : "no text"} for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
     );
 
-    const questions = await extractWithGemini(files, rewriteScenario);
+    const questions = await extractWithGemini(files, rewriteScenario, pastedText);
     console.log(`extract-mcqs: got ${questions.length} questions`);
 
     if (uploadLogId) {
