@@ -611,6 +611,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        ok: true,
         bankId: bank.id,
         count: rows.length,
         flagged,
