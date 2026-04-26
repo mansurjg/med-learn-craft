@@ -344,29 +344,38 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing auth" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: false, error: "MISSING_AUTH", message: "You must be signed in to upload." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: serviceKey, Authorization: authHeader },
     });
     if (!userResp.ok) {
-      return new Response(JSON.stringify({ error: "Invalid auth" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: false, error: "INVALID_AUTH", message: "Your session has expired. Please sign in again." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     const userData = await userResp.json();
     userId = userData.id as string;
 
-    const payload = await req.json();
+    let payload: Record<string, unknown>;
+    try {
+      payload = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ ok: false, error: "INVALID_JSON", message: "Invalid request body." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     let files: { name: string; mimeType: string; data: string }[] = [];
     if (Array.isArray(payload.files)) {
-      files = payload.files;
+      files = payload.files as { name: string; mimeType: string; data: string }[];
     } else if (Array.isArray(payload.images)) {
-      files = payload.images.map((url: string, i: number) => {
+      files = (payload.images as string[]).map((url: string, i: number) => {
         const m = url.match(/^data:([^;]+);base64,(.+)$/);
         return {
           name: `image-${i + 1}`,
@@ -379,26 +388,20 @@ Deno.serve(async (req) => {
     const subject = (payload.subject as string | undefined) ?? null;
     const rewriteScenario = Boolean(payload.rewriteScenario);
     const pastedText =
-      typeof payload.text === "string" && payload.text.trim()
+      typeof payload.text === "string" && (payload.text as string).trim()
         ? (payload.text as string)
         : null;
 
     if ((files.length === 0 && !pastedText) || !bankTitle) {
       return new Response(
-        JSON.stringify({ error: "Missing files/text or bankTitle" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ ok: false, error: "MISSING_INPUT", message: "Please add at least one file or paste MCQ text, and provide a bank title." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     if (files.length > 20) {
       return new Response(
-        JSON.stringify({ error: "Maximum 20 files per upload" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ ok: false, error: "TOO_MANY_FILES", message: "Maximum 20 files per upload." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
