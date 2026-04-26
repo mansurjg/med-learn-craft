@@ -128,7 +128,8 @@ const REWRITE_ADDENDUM = `
 
 async function extractWithGemini(
   files: { mimeType: string; data: string }[],
-  rewriteScenario: boolean
+  rewriteScenario: boolean,
+  pastedText?: string | null
 ): Promise<ExtractedQuestion[]> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
@@ -145,6 +146,12 @@ async function extractWithGemini(
         : "Extract every MCQ from these documents. Detect answer markers carefully.",
     },
   ];
+  if (pastedText && pastedText.trim()) {
+    content.push({
+      type: "text",
+      text: `--- PASTED MCQ TEXT (treat as authoritative source, extract every question) ---\n\n${pastedText.trim()}`,
+    });
+  }
   for (const f of files) {
     const url = `data:${f.mimeType};base64,${f.data}`;
     content.push({ type: "image_url", image_url: { url } });
