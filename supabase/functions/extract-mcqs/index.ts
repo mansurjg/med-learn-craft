@@ -126,60 +126,39 @@ const REWRITE_ADDENDUM = `
    - Keep stem length similar to source. No filler.
    This rule does NOT apply to pure factual MCQs without a clinical vignette — clean OCR only for those.`;
 
-async function extractWithGrok(
+async function extractWithGemini(
   files: { mimeType: string; data: string }[],
   rewriteScenario: boolean,
   pastedText?: string | null
 ): Promise<ExtractedQuestion[]> {
-  const apiKey = Deno.env.get("XAI_API_KEY");
-  if (!apiKey) throw new Error("XAI_API_KEY not configured");
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
   const systemPrompt = rewriteScenario
     ? SYSTEM_PROMPT_BASE + REWRITE_ADDENDUM
     : SYSTEM_PROMPT_BASE;
-
-  // Pick model: vision-capable when images are present, text model otherwise.
-  const hasImages = files.some((f) => f.mimeType.startsWith("image/"));
-  const model = hasImages ? "grok-2-vision-latest" : "grok-2-latest";
-
-  // Truncate excessively long pasted text to keep token usage low.
-  const trimmedText =
-    pastedText && pastedText.trim()
-      ? pastedText.trim().slice(0, 60_000)
-      : null;
 
   const content: Array<Record<string, unknown>> = [
     {
       type: "text",
       text: rewriteScenario
         ? "Extract every MCQ. Rewrite each clinical scenario originally per rule 10. Preserve concept and correct answer."
-        : "Extract every MCQ. Detect answer markers carefully.",
+        : "Extract every MCQ from these documents. Detect answer markers carefully.",
     },
   ];
-  if (trimmedText) {
+  if (pastedText && pastedText.trim()) {
     content.push({
       type: "text",
-      text: `--- PASTED MCQ TEXT (authoritative source, extract every question) ---\n\n${trimmedText}`,
+      text: `--- PASTED MCQ TEXT (treat as authoritative source, extract every question) ---\n\n${pastedText.trim()}`,
     });
   }
   for (const f of files) {
-    if (!f.mimeType.startsWith("image/")) {
-      // Grok chat API doesn't accept PDFs directly. Skip non-image files and
-      // surface a clear error so the user uploads images or pastes text.
-      throw new Error(
-        "xAI Grok only accepts images or text. Convert PDFs to images, or paste the question text."
-      );
-    }
     const url = `data:${f.mimeType};base64,${f.data}`;
-    content.push({
-      type: "image_url",
-      image_url: { url, detail: "high" },
-    });
+    content.push({ type: "image_url", image_url: { url } });
   }
 
   const body = {
-    model,
-    temperature: 0,
+    model: "google/gemini-3-flash-preview",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content },
@@ -255,24 +234,23 @@ async function extractWithGrok(
     tool_choice: { type: "function", function: { name: "submit_questions" } },
   };
 
-  const resp = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const resp = await fetch(
+    "https://ai.gateway.lovable.dev/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }
+  );
 
   if (!resp.ok) {
     const txt = await resp.text();
-    console.error(`xAI error ${resp.status}: ${txt}`);
     if (resp.status === 429) throw new Error("RATE_LIMIT");
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error("XAI_AUTH_FAILED");
-    }
     if (resp.status === 402) throw new Error("PAYMENT_REQUIRED");
-    throw new Error(`xAI request failed: ${resp.status}`);
+    throw new Error(`AI gateway: ${resp.status} ${txt}`);
   }
 
   const data = await resp.json();
@@ -462,7 +440,7 @@ Deno.serve(async (req) => {
       `extract-mcqs: ${files.length} file(s) + ${pastedText ? "text" : "no text"} for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
     );
 
-    const questions = await extractWithGrok(files, rewriteScenario, pastedText);
+    const questions = await extractWithGemini(files, rewriteScenario, pastedText);
     console.log(`extract-mcqs: got ${questions.length} questions`);
 
     if (uploadLogId) {
@@ -674,16 +652,11 @@ Deno.serve(async (req) => {
     let userMessage = msg;
     if (msg === "RATE_LIMIT") {
       status = 429;
-      userMessage = "xAI rate limit reached. Please try again in a minute.";
+      userMessage = "Rate limit reached. Please try again in a minute.";
     } else if (msg === "PAYMENT_REQUIRED") {
       status = 402;
-      userMessage = "xAI account out of credits. Top up at console.x.ai.";
-    } else if (msg === "XAI_AUTH_FAILED") {
-      status = 401;
-      userMessage = "Invalid XAI_API_KEY. Check the secret value.";
-    } else if (msg === "XAI_API_KEY not configured") {
-      status = 500;
-      userMessage = "XAI_API_KEY not configured";
+      userMessage =
+        "Lovable AI credits exhausted. Add credits in Settings → Workspace → Usage.";
     }
     return new Response(JSON.stringify({ error: userMessage }), {
       status,
