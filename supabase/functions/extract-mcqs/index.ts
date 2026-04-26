@@ -390,10 +390,14 @@ Deno.serve(async (req) => {
     const bankTitle = payload.bankTitle as string;
     const subject = (payload.subject as string | undefined) ?? null;
     const rewriteScenario = Boolean(payload.rewriteScenario);
+    const pastedText =
+      typeof payload.text === "string" && payload.text.trim()
+        ? (payload.text as string)
+        : null;
 
-    if (files.length === 0 || !bankTitle) {
+    if ((files.length === 0 && !pastedText) || !bankTitle) {
       return new Response(
-        JSON.stringify({ error: "Missing files or bankTitle" }),
+        JSON.stringify({ error: "Missing files/text or bankTitle" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
