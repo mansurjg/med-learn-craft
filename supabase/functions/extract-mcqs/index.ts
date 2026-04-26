@@ -126,39 +126,60 @@ const REWRITE_ADDENDUM = `
    - Keep stem length similar to source. No filler.
    This rule does NOT apply to pure factual MCQs without a clinical vignette — clean OCR only for those.`;
 
-async function extractWithGemini(
+async function extractWithGrok(
   files: { mimeType: string; data: string }[],
   rewriteScenario: boolean,
   pastedText?: string | null
 ): Promise<ExtractedQuestion[]> {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+  const apiKey = Deno.env.get("XAI_API_KEY");
+  if (!apiKey) throw new Error("XAI_API_KEY not configured");
 
   const systemPrompt = rewriteScenario
     ? SYSTEM_PROMPT_BASE + REWRITE_ADDENDUM
     : SYSTEM_PROMPT_BASE;
+
+  // Pick model: vision-capable when images are present, text model otherwise.
+  const hasImages = files.some((f) => f.mimeType.startsWith("image/"));
+  const model = hasImages ? "grok-2-vision-latest" : "grok-2-latest";
+
+  // Truncate excessively long pasted text to keep token usage low.
+  const trimmedText =
+    pastedText && pastedText.trim()
+      ? pastedText.trim().slice(0, 60_000)
+      : null;
 
   const content: Array<Record<string, unknown>> = [
     {
       type: "text",
       text: rewriteScenario
         ? "Extract every MCQ. Rewrite each clinical scenario originally per rule 10. Preserve concept and correct answer."
-        : "Extract every MCQ from these documents. Detect answer markers carefully.",
+        : "Extract every MCQ. Detect answer markers carefully.",
     },
   ];
-  if (pastedText && pastedText.trim()) {
+  if (trimmedText) {
     content.push({
       type: "text",
-      text: `--- PASTED MCQ TEXT (treat as authoritative source, extract every question) ---\n\n${pastedText.trim()}`,
+      text: `--- PASTED MCQ TEXT (authoritative source, extract every question) ---\n\n${trimmedText}`,
     });
   }
   for (const f of files) {
+    if (!f.mimeType.startsWith("image/")) {
+      // Grok chat API doesn't accept PDFs directly. Skip non-image files and
+      // surface a clear error so the user uploads images or pastes text.
+      throw new Error(
+        "xAI Grok only accepts images or text. Convert PDFs to images, or paste the question text."
+      );
+    }
     const url = `data:${f.mimeType};base64,${f.data}`;
-    content.push({ type: "image_url", image_url: { url } });
+    content.push({
+      type: "image_url",
+      image_url: { url, detail: "high" },
+    });
   }
 
   const body = {
-    model: "google/gemini-3-flash-preview",
+    model,
+    temperature: 0,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content },
