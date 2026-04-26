@@ -70,6 +70,7 @@ function UploadPage() {
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [pastedText, setPastedText] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
   const [result, setResult] = useState<ResultSummary | null>(null);
   const [dragOver, setDragOver] = useState(false);
