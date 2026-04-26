@@ -393,6 +393,23 @@ function UploadPage() {
           </ul>
         )}
 
+        <div className="mt-5 space-y-1.5">
+          <Label htmlFor="pasted-text">Or paste MCQ text (optional)</Label>
+          <Textarea
+            id="pasted-text"
+            placeholder={`You can paste MCQs directly here. Example:\n\n1. Most common cause of community-acquired pneumonia?\na) Staphylococcus aureus\nb) Streptococcus pneumoniae ✓\nc) Klebsiella pneumoniae\nd) Mycoplasma pneumoniae\nAns: b`}
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            disabled={busy}
+            rows={6}
+            className="font-mono text-xs"
+          />
+          <p className="text-xs text-muted-foreground">
+            Combine with PDFs/photos above, or use text alone. MedAI will extract
+            and format every question.
+          </p>
+        </div>
+
         {/* Copyright rewrite toggle */}
         <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/30 p-4">
           <div className="flex min-w-0 items-start gap-3">
