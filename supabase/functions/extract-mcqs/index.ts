@@ -255,23 +255,24 @@ async function extractWithGrok(
     tool_choice: { type: "function", function: { name: "submit_questions" } },
   };
 
-  const resp = await fetch(
-    "https://ai.gateway.lovable.dev/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }
-  );
+  const resp = await fetch("https://api.x.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!resp.ok) {
     const txt = await resp.text();
+    console.error(`xAI error ${resp.status}: ${txt}`);
     if (resp.status === 429) throw new Error("RATE_LIMIT");
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error("XAI_AUTH_FAILED");
+    }
     if (resp.status === 402) throw new Error("PAYMENT_REQUIRED");
-    throw new Error(`AI gateway: ${resp.status} ${txt}`);
+    throw new Error(`xAI request failed: ${resp.status}`);
   }
 
   const data = await resp.json();
