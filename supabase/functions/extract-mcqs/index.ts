@@ -461,7 +461,7 @@ Deno.serve(async (req) => {
       `extract-mcqs: ${files.length} file(s) + ${pastedText ? "text" : "no text"} for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
     );
 
-    const questions = await extractWithGemini(files, rewriteScenario, pastedText);
+    const questions = await extractWithGrok(files, rewriteScenario, pastedText);
     console.log(`extract-mcqs: got ${questions.length} questions`);
 
     if (uploadLogId) {
