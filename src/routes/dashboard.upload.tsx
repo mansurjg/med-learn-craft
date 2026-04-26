@@ -496,7 +496,7 @@ function UploadPage() {
             )}
             <Button
               onClick={submit}
-              disabled={busy || files.length === 0 || !title.trim()}
+              disabled={busy || (files.length === 0 && !pastedText.trim()) || !title.trim()}
             >
               {busy ? (
                 <>
