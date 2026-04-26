@@ -100,6 +100,8 @@ function QuestionsPage() {
   const [editing, setEditing] = useState<QuestionRow | null>(null);
   const [testing, setTesting] = useState<QuestionRow | null>(null);
   const [deleting, setDeleting] = useState<QuestionRow | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [confirmDownload, setConfirmDownload] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -210,6 +212,36 @@ function QuestionsPage() {
     void load();
   };
 
+  const handleDeleteAll = async () => {
+    if (!user) return;
+    setDeletingAll(true);
+    try {
+      // Find banks the user can mutate. Super admins see all banks; others only their own.
+      let banksQuery = supabase.from("question_banks").select("id");
+      if (!isSuperAdmin) banksQuery = banksQuery.eq("owner_id", user.id);
+      const { data: banks, error: banksErr } = await banksQuery;
+      if (banksErr) throw banksErr;
+      const bankIds = (banks ?? []).map((b) => b.id);
+      if (bankIds.length === 0) {
+        toast.info("No questions to delete");
+        setConfirmDeleteAll(false);
+        return;
+      }
+      const { error } = await supabase
+        .from("questions")
+        .delete()
+        .in("bank_id", bankIds);
+      if (error) throw error;
+      toast.success("All questions deleted");
+      setConfirmDeleteAll(false);
+      void load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
@@ -223,20 +255,35 @@ function QuestionsPage() {
               : "Questions from banks you own."}
           </p>
         </div>
-        {isStaff && (
+        <div className="flex flex-wrap gap-2">
+          {isStaff && (
+            <Button
+              onClick={() => setConfirmDownload(true)}
+              disabled={downloading}
+              className="gap-2"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {downloading ? "Preparing…" : "Download Full Question Bank"}
+            </Button>
+          )}
           <Button
-            onClick={() => setConfirmDownload(true)}
-            disabled={downloading}
-            className="w-full gap-2 sm:w-auto"
+            variant="destructive"
+            onClick={() => setConfirmDeleteAll(true)}
+            disabled={deletingAll || count === 0}
+            className="gap-2"
           >
-            {downloading ? (
+            {deletingAll ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Download className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             )}
-            {downloading ? "Preparing…" : "Download Full Question Bank"}
+            Delete all
           </Button>
-        )}
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -450,6 +497,43 @@ function QuestionsPage() {
                 <Download className="h-4 w-4" />
               )}
               {downloading ? "Preparing…" : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmDeleteAll}
+        onOpenChange={(o) => !deletingAll && setConfirmDeleteAll(o)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete ALL questions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes every question
+              {isSuperAdmin
+                ? " across the entire platform"
+                : " from every bank you own"}
+              . Question banks themselves stay. Existing exam attempts are not
+              affected. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDeleteAll();
+              }}
+              disabled={deletingAll}
+              className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              {deletingAll ? "Deleting…" : "Delete all"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -3,6 +3,7 @@ import { useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -69,6 +70,7 @@ function UploadPage() {
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [pastedText, setPastedText] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
   const [result, setResult] = useState<ResultSummary | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -144,7 +146,9 @@ function UploadPage() {
 
   const submit = async () => {
     if (!title.trim()) return toast.error("Please enter a bank title");
-    if (files.length === 0) return toast.error("Please add at least one file");
+    const trimmedText = pastedText.trim();
+    if (files.length === 0 && !trimmedText)
+      return toast.error("Add at least one file or paste MCQ text");
 
     setResult(null);
     setStage("reading");
@@ -168,6 +172,7 @@ function UploadPage() {
       const requestPromise = supabase.functions.invoke("extract-mcqs", {
         body: {
           files: payloadFiles,
+          text: trimmedText || undefined,
           bankTitle: title.trim(),
           subject: subject.trim() || null,
           rewriteScenario,
@@ -203,6 +208,7 @@ function UploadPage() {
   const reset = () => {
     files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
     setFiles([]);
+    setPastedText("");
     setTitle("");
     setSubject("");
     setRewriteScenario(false);
@@ -387,6 +393,23 @@ function UploadPage() {
           </ul>
         )}
 
+        <div className="mt-5 space-y-1.5">
+          <Label htmlFor="pasted-text">Or paste MCQ text (optional)</Label>
+          <Textarea
+            id="pasted-text"
+            placeholder={`You can paste MCQs directly here. Example:\n\n1. Most common cause of community-acquired pneumonia?\na) Staphylococcus aureus\nb) Streptococcus pneumoniae ✓\nc) Klebsiella pneumoniae\nd) Mycoplasma pneumoniae\nAns: b`}
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            disabled={busy}
+            rows={6}
+            className="font-mono text-xs"
+          />
+          <p className="text-xs text-muted-foreground">
+            Combine with PDFs/photos above, or use text alone. MedAI will extract
+            and format every question.
+          </p>
+        </div>
+
         {/* Copyright rewrite toggle */}
         <div className="mt-5 flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/30 p-4">
           <div className="flex min-w-0 items-start gap-3">
@@ -473,7 +496,7 @@ function UploadPage() {
             )}
             <Button
               onClick={submit}
-              disabled={busy || files.length === 0 || !title.trim()}
+              disabled={busy || (files.length === 0 && !pastedText.trim()) || !title.trim()}
             >
               {busy ? (
                 <>

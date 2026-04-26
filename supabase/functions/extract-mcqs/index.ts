@@ -128,7 +128,8 @@ const REWRITE_ADDENDUM = `
 
 async function extractWithGemini(
   files: { mimeType: string; data: string }[],
-  rewriteScenario: boolean
+  rewriteScenario: boolean,
+  pastedText?: string | null
 ): Promise<ExtractedQuestion[]> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
@@ -145,6 +146,12 @@ async function extractWithGemini(
         : "Extract every MCQ from these documents. Detect answer markers carefully.",
     },
   ];
+  if (pastedText && pastedText.trim()) {
+    content.push({
+      type: "text",
+      text: `--- PASTED MCQ TEXT (treat as authoritative source, extract every question) ---\n\n${pastedText.trim()}`,
+    });
+  }
   for (const f of files) {
     const url = `data:${f.mimeType};base64,${f.data}`;
     content.push({ type: "image_url", image_url: { url } });
@@ -383,10 +390,14 @@ Deno.serve(async (req) => {
     const bankTitle = payload.bankTitle as string;
     const subject = (payload.subject as string | undefined) ?? null;
     const rewriteScenario = Boolean(payload.rewriteScenario);
+    const pastedText =
+      typeof payload.text === "string" && payload.text.trim()
+        ? (payload.text as string)
+        : null;
 
-    if (files.length === 0 || !bankTitle) {
+    if ((files.length === 0 && !pastedText) || !bankTitle) {
       return new Response(
-        JSON.stringify({ error: "Missing files or bankTitle" }),
+        JSON.stringify({ error: "Missing files/text or bankTitle" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -403,8 +414,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const fileNames = files.map((f) => f.name).join(", ").slice(0, 500);
-    const fileTypes = Array.from(new Set(files.map((f) => f.mimeType))).join(", ");
+    const namesArr = files.map((f) => f.name);
+    if (pastedText) namesArr.push("pasted-text.txt");
+    const fileNames = namesArr.join(", ").slice(0, 500);
+    const typesArr = Array.from(new Set(files.map((f) => f.mimeType)));
+    if (pastedText) typesArr.push("text/plain");
+    const fileTypes = typesArr.join(", ") || "text/plain";
     const logResp = await fetch(`${supabaseUrl}/rest/v1/upload_logs`, {
       method: "POST",
       headers: adminHeaders,
@@ -412,7 +427,7 @@ Deno.serve(async (req) => {
         uploader_id: userId,
         file_name: fileNames,
         file_type: fileTypes,
-        page_count: files.length,
+        page_count: files.length + (pastedText ? 1 : 0),
         processing_status: "extracting",
       }),
     });
@@ -422,10 +437,10 @@ Deno.serve(async (req) => {
     }
 
     console.log(
-      `extract-mcqs: ${files.length} file(s) for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
+      `extract-mcqs: ${files.length} file(s) + ${pastedText ? "text" : "no text"} for ${userId} (${fileTypes}) rewrite=${rewriteScenario}`
     );
 
-    const questions = await extractWithGemini(files, rewriteScenario);
+    const questions = await extractWithGemini(files, rewriteScenario, pastedText);
     console.log(`extract-mcqs: got ${questions.length} questions`);
 
     if (uploadLogId) {
