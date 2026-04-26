@@ -674,11 +674,16 @@ Deno.serve(async (req) => {
     let userMessage = msg;
     if (msg === "RATE_LIMIT") {
       status = 429;
-      userMessage = "Rate limit reached. Please try again in a minute.";
+      userMessage = "xAI rate limit reached. Please try again in a minute.";
     } else if (msg === "PAYMENT_REQUIRED") {
       status = 402;
-      userMessage =
-        "Lovable AI credits exhausted. Add credits in Settings → Workspace → Usage.";
+      userMessage = "xAI account out of credits. Top up at console.x.ai.";
+    } else if (msg === "XAI_AUTH_FAILED") {
+      status = 401;
+      userMessage = "Invalid XAI_API_KEY. Check the secret value.";
+    } else if (msg === "XAI_API_KEY not configured") {
+      status = 500;
+      userMessage = "XAI_API_KEY not configured";
     }
     return new Response(JSON.stringify({ error: userMessage }), {
       status,
