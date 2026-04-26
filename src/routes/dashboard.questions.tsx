@@ -212,6 +212,36 @@ function QuestionsPage() {
     void load();
   };
 
+  const handleDeleteAll = async () => {
+    if (!user) return;
+    setDeletingAll(true);
+    try {
+      // Find banks the user can mutate. Super admins see all banks; others only their own.
+      let banksQuery = supabase.from("question_banks").select("id");
+      if (!isSuperAdmin) banksQuery = banksQuery.eq("owner_id", user.id);
+      const { data: banks, error: banksErr } = await banksQuery;
+      if (banksErr) throw banksErr;
+      const bankIds = (banks ?? []).map((b) => b.id);
+      if (bankIds.length === 0) {
+        toast.info("No questions to delete");
+        setConfirmDeleteAll(false);
+        return;
+      }
+      const { error } = await supabase
+        .from("questions")
+        .delete()
+        .in("bank_id", bankIds);
+      if (error) throw error;
+      toast.success("All questions deleted");
+      setConfirmDeleteAll(false);
+      void load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
