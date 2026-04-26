@@ -200,8 +200,14 @@ function UploadPage() {
       toast.success(`Extracted ${data.count} questions`);
     } catch (e) {
       setStage("error");
-      const msg = e instanceof Error ? e.message : "Upload failed";
-      toast.error(msg);
+      const raw = e instanceof Error ? e.message : "Upload failed";
+      let msg = raw;
+      if (/PAYMENT_REQUIRED|402/i.test(raw)) {
+        msg = "AI credits exhausted. Add credits in Settings → Workspace → Usage to continue extracting.";
+      } else if (/RATE_LIMIT|429/i.test(raw)) {
+        msg = "AI rate limit hit. Please wait a minute and try again.";
+      }
+      toast.error(msg, { duration: 8000 });
     }
   };
 
