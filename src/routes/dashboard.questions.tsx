@@ -255,20 +255,35 @@ function QuestionsPage() {
               : "Questions from banks you own."}
           </p>
         </div>
-        {isStaff && (
+        <div className="flex flex-wrap gap-2">
+          {isStaff && (
+            <Button
+              onClick={() => setConfirmDownload(true)}
+              disabled={downloading}
+              className="gap-2"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {downloading ? "Preparing…" : "Download Full Question Bank"}
+            </Button>
+          )}
           <Button
-            onClick={() => setConfirmDownload(true)}
-            disabled={downloading}
-            className="w-full gap-2 sm:w-auto"
+            variant="destructive"
+            onClick={() => setConfirmDeleteAll(true)}
+            disabled={deletingAll || count === 0}
+            className="gap-2"
           >
-            {downloading ? (
+            {deletingAll ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Download className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             )}
-            {downloading ? "Preparing…" : "Download Full Question Bank"}
+            Delete all
           </Button>
-        )}
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
