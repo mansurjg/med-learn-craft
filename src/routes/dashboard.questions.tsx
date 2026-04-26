@@ -100,6 +100,8 @@ function QuestionsPage() {
   const [editing, setEditing] = useState<QuestionRow | null>(null);
   const [testing, setTesting] = useState<QuestionRow | null>(null);
   const [deleting, setDeleting] = useState<QuestionRow | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [confirmDownload, setConfirmDownload] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
