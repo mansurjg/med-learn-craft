@@ -501,6 +501,43 @@ function QuestionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={confirmDeleteAll}
+        onOpenChange={(o) => !deletingAll && setConfirmDeleteAll(o)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete ALL questions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes every question
+              {isSuperAdmin
+                ? " across the entire platform"
+                : " from every bank you own"}
+              . Question banks themselves stay. Existing exam attempts are not
+              affected. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDeleteAll();
+              }}
+              disabled={deletingAll}
+              className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              {deletingAll ? "Deleting…" : "Delete all"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
